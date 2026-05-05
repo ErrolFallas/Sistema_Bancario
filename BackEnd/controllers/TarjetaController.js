@@ -3,7 +3,7 @@
 // CRUD para la entidad Tarjeta
 // ============================================
 
-const { Tarjeta, Cuenta, TipoTarjeta, MarcaTarjeta, EstadoTarjeta } = require("../models");
+const { Tarjeta, Cuenta, TipoTarjeta, MarcaTarjeta, EstadoTarjeta, Cliente } = require("../models");
 
 const crearTarjeta = async (req, res) => {
   try {
@@ -16,14 +16,23 @@ const crearTarjeta = async (req, res) => {
 
 const buscarTarjetas = async (req, res) => {
   try {
-    const tarjetas = await Tarjeta.findAll({
+    const opciones = {
       include: [
-        { model: Cuenta, as: "cuenta" },
+        { 
+          model: Cuenta, 
+          as: "cuenta",
+          include: req.user && req.user.rol === 'CLIENTE' ? [{
+            model: Cliente,
+            as: "clientes",
+            where: { idCliente: req.user.idCliente }
+          }] : []
+        },
         { model: TipoTarjeta, as: "tipoTarjeta" },
         { model: MarcaTarjeta, as: "marcaTarjeta" },
         { model: EstadoTarjeta, as: "estadoTarjeta" },
       ],
-    });
+    };
+    const tarjetas = await Tarjeta.findAll(opciones);
     return res.status(200).json(tarjetas);
   } catch (error) {
     return res.status(500).json({ error: 'Error interno del servidor al procesar la solicitud.', detalle: error.message });

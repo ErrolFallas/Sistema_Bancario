@@ -5,6 +5,11 @@
 const express = require("express");
 const router = express.Router();
 
+const { autenticarToken } = require('../middlewares/autenticarToken');
+const { verificarRol } = require('../middlewares/verificarRol');
+const { verificarPropiedad } = require('../middlewares/verificarPropiedad');
+
+
 const {
   crearBanco,
   buscarBancos,
@@ -13,10 +18,10 @@ const {
   actualizarBanco,
 } = require("../controllers/BancoController");
 
-router.post("/", crearBanco);
-router.get("/", buscarBancos);
-router.get("/:id", buscarBancoId);
-router.delete("/:id", eliminarBanco);
-router.patch("/:id", actualizarBanco);
+router.post("/", autenticarToken, verificarRol('ADMIN'), crearBanco);
+router.get("/", autenticarToken, verificarRol('ADMIN'), buscarBancos);
+router.get("/:id", autenticarToken, verificarRol('ADMIN'), buscarBancoId);
+router.delete("/:id", autenticarToken, verificarRol('ADMIN'), eliminarBanco);
+router.patch("/:id", autenticarToken, verificarRol('ADMIN'), actualizarBanco);
 
 module.exports = router;

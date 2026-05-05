@@ -23,17 +23,18 @@ const { verificarRol }    = require('../middlewares/verificarRol');
 
 // Soft-delete: el propio usuario desactiva su cuenta (cualquier rol)
 // ⚠️ Debe ir ANTES de /:id para que Express no la interprete como un param
-router.patch('/eliminar-cuenta', autenticarToken, desactivarCuenta);
+router.patch('/eliminar-cuenta', autenticarToken, verificarRol('CLIENTE', 'EMPLEADO'), desactivarCuenta);
 
 // Solo ADMIN puede crear y listar todos los usuarios
-router.post('/',    autenticarToken, verificarRol('admin'), crearUsuario);
-router.get('/',     autenticarToken, verificarRol('admin'), buscarUsuarios);
+// Solo ADMIN puede crear y listar todos los usuarios
+router.post('/',    autenticarToken, verificarRol('ADMIN'), crearUsuario);
+router.get('/',     autenticarToken, verificarRol('ADMIN'), buscarUsuarios);
 
 // ADMIN puede ver y editar cualquier usuario
-router.get('/:id',    autenticarToken, verificarRol('admin'), buscarUsuarioId);
-router.patch('/:id',  autenticarToken, verificarRol('admin'), actualizarUsuario);
+router.get('/:id',    autenticarToken, verificarRol('ADMIN'), buscarUsuarioId);
+router.patch('/:id',  autenticarToken, verificarRol('ADMIN'), actualizarUsuario);
 
 // Hard-delete: EXCLUSIVO para ADMIN
-router.delete('/:id', autenticarToken, verificarRol('admin'), eliminarUsuario);
+router.delete('/:id', autenticarToken, verificarRol('ADMIN'), eliminarUsuario);
 
 module.exports = router;

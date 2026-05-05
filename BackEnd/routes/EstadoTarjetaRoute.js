@@ -5,6 +5,11 @@
 const express = require("express");
 const router = express.Router();
 
+const { autenticarToken } = require('../middlewares/autenticarToken');
+const { verificarRol } = require('../middlewares/verificarRol');
+const { verificarPropiedad } = require('../middlewares/verificarPropiedad');
+
+
 const {
   crearEstadoTarjeta,
   buscarEstadosTarjeta,
@@ -13,10 +18,10 @@ const {
   actualizarEstadoTarjeta,
 } = require("../controllers/EstadoTarjetaController");
 
-router.post("/", crearEstadoTarjeta);
-router.get("/", buscarEstadosTarjeta);
-router.get("/:id", buscarEstadoTarjetaId);
-router.delete("/:id", eliminarEstadoTarjeta);
-router.patch("/:id", actualizarEstadoTarjeta);
+router.post("/", autenticarToken, verificarRol('ADMIN'), crearEstadoTarjeta);
+router.get("/", autenticarToken, buscarEstadosTarjeta);
+router.get("/:id", autenticarToken, buscarEstadoTarjetaId);
+router.delete("/:id", autenticarToken, verificarRol('ADMIN'), eliminarEstadoTarjeta);
+router.patch("/:id", autenticarToken, verificarRol('ADMIN'), actualizarEstadoTarjeta);
 
 module.exports = router;

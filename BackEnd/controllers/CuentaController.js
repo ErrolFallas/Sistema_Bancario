@@ -64,13 +64,18 @@ const crearCuenta = async (req, res) => {
 // ============================================
 const buscarCuentas = async (req, res) => {
   try {
-    const cuentas = await Cuenta.findAll({
+    const opciones = {
       include: [
         { model: Banco, as: "banco" },
         { model: TipoCuenta, as: "tipoCuenta" },
-        { model: Cliente, as: "clientes" },
+        { 
+          model: Cliente, 
+          as: "clientes",
+          ...(req.user && req.user.rol === 'CLIENTE' ? { where: { idCliente: req.user.idCliente } } : {})
+        },
       ],
-    });
+    };
+    const cuentas = await Cuenta.findAll(opciones);
     return res.status(200).json(cuentas);
   } catch (error) {
     return res.status(500).json({ error: 'Error interno del servidor al procesar la solicitud.', detalle: error.message });

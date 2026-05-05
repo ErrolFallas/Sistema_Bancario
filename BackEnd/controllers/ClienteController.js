@@ -16,7 +16,11 @@ const crearCliente = async (req, res) => {
 
 const buscarClientes = async (req, res) => {
   try {
-    const clientes = await Cliente.findAll();
+    const where = {};
+    if (req.user && req.user.rol === 'CLIENTE') {
+      where.idCliente = req.user.idCliente;
+    }
+    const clientes = await Cliente.findAll({ where });
     return res.status(200).json(clientes);
   } catch (error) {
     return res.status(500).json({ error: 'Error interno del servidor al procesar la solicitud.', detalle: error.message });

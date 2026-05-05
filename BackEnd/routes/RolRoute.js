@@ -5,6 +5,11 @@
 const express = require("express");
 const router = express.Router();
 
+const { autenticarToken } = require('../middlewares/autenticarToken');
+const { verificarRol } = require('../middlewares/verificarRol');
+const { verificarPropiedad } = require('../middlewares/verificarPropiedad');
+
+
 const {
   crearRol,
   buscarRoles,
@@ -13,10 +18,10 @@ const {
   actualizarRol,
 } = require("../controllers/RolController");
 
-router.post("/", crearRol);
-router.get("/", buscarRoles);
-router.get("/:id", buscarRolId);
-router.delete("/:id", eliminarRol);
-router.patch("/:id", actualizarRol);
+router.post("/", autenticarToken, verificarRol('SUPER_ADMIN'), crearRol);
+router.get("/", autenticarToken, verificarRol('SUPER_ADMIN'), buscarRoles);
+router.get("/:id", autenticarToken, verificarRol('SUPER_ADMIN'), buscarRolId);
+router.delete("/:id", autenticarToken, verificarRol('SUPER_ADMIN'), eliminarRol);
+router.patch("/:id", autenticarToken, verificarRol('SUPER_ADMIN'), actualizarRol);
 
 module.exports = router;

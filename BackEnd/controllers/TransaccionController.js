@@ -23,7 +23,8 @@ const crearTransaccion = async (req, res) => {
 
 const buscarTransacciones = async (req, res) => {
   try {
-    const transacciones = await Transaccion.findAll({
+    const opciones = {
+      where: req.user && req.user.rol === 'CLIENTE' ? { idCliente: req.user.idCliente } : {},
       include: [
         { model: Cliente, as: "cliente" },
         { model: Cuenta, as: "cuentaOrigen" },
@@ -32,7 +33,8 @@ const buscarTransacciones = async (req, res) => {
         { model: TipoTransaccion, as: "tipoTransaccion" },
         { model: EstadoTransaccion, as: "estadoTransaccion" },
       ],
-    });
+    };
+    const transacciones = await Transaccion.findAll(opciones);
     return res.status(200).json(transacciones);
   } catch (error) {
     return res.status(500).json({ error: 'Error interno del servidor al procesar la solicitud.', detalle: error.message });
@@ -74,16 +76,7 @@ const actualizarTransaccion = async (req, res) => {
 };
 
 const eliminarTransaccion = async (req, res) => {
-  try {
-    const transaccion = await Transaccion.findByPk(req.params.id);
-    if (!transaccion) {
-      return res.status(404).json({ error: `Error de búsqueda: No se encontró el registro de Transacción con el ID proporcionado en la base de datos.` });
-    }
-    await transaccion.destroy();
-    return res.status(200).json({ mensaje: "Transacción eliminada correctamente" });
-  } catch (error) {
-    return res.status(500).json({ error: 'Error interno del servidor al procesar la solicitud.', detalle: error.message });
-  }
+  return res.status(403).json({ error: 'Operación denegada. No está permitido eliminar transacciones de la base de datos por normativa financiera. Utilice un reverso lógico.' });
 };
 
 module.exports = {

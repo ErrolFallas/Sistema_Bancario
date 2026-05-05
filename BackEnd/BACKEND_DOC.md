@@ -4,7 +4,7 @@
 
 El **Backend del Sistema Bancario** es un proyecto construido con **Node.js** y **Sequelize ORM**, diseñado bajo el patrón de arquitectura **MVC (Modelo - Vista - Controlador)**. Su propósito es gestionar todas las operaciones bancarias: clientes, cuentas, tarjetas, transacciones, préstamos, empleados y auditoría, conectándose a una base de datos **MySQL**.
 
-Actualmente el proyecto se encuentra en **fase de modelado de datos**: los 23 modelos Sequelize y sus 23 migraciones están implementados y sincronizados con la base de datos. Las capas de controladores, rutas y middlewares están pendientes de desarrollo.
+Actualmente el proyecto **tiene implementada su arquitectura completa**: los 23 modelos Sequelize y sus migraciones están sincronizados, y todas las capas de controladores, rutas y middlewares (autenticación JWT, verificación de roles y manejos de errores descriptivos) ya están en funcionamiento.
 
 ---
 
@@ -57,23 +57,24 @@ BackEnd/
 └── ENTIDADES_DOC.md                 # Documentación detallada de cada entidad
 ```
 
-### Estructura planificada (pendiente de implementación)
+### Estructura implementada (Controladores, Rutas y Middlewares)
 
 ```
 BackEnd/
-├── controllers/         # Lógica de negocio (por implementar)
-│   ├── clienteController.js
-│   ├── cuentaController.js
-│   ├── transaccionController.js
+├── controllers/         # Lógica de negocio (24 controladores)
+│   ├── AuthController.js    # Login y generación de JWT
+│   ├── UsuarioController.js
+│   ├── CuentaController.js
 │   └── ...
-├── routes/              # Definición de rutas/endpoints (por implementar)
-│   ├── clienteRoutes.js
-│   ├── cuentaRoutes.js
+├── routes/              # Definición de endpoints de la API REST
+│   ├── AuthRoute.js
+│   ├── UsuarioRoute.js
 │   └── ...
-├── middlewares/          # Middlewares (por implementar)
-│   ├── authMiddleware.js
-│   └── errorHandler.js
-├── seeders/             # Datos semilla (por implementar)
+├── middlewares/         # Middlewares de seguridad y validación
+│   ├── autenticarToken.js   # Valida JWT
+│   ├── verificarRol.js      # Valida RBAC (Jerarquía de Roles)
+│   └── verificarPropiedad.js# Valida pertenencia de recursos (Ownership)
+├── seed_usuarios.js     # Datos semilla (obsoleto tras creación dinámica)
 └── index.js             # Punto de entrada del servidor (por implementar)
 ```
 
@@ -84,9 +85,9 @@ BackEnd/
 | **Modelo** | Define la estructura de datos, validaciones y asociaciones con Sequelize ORM. | ✅ Implementado |
 | **Migraciones** | Scripts para crear/modificar tablas en MySQL de forma controlada y versionada. | ✅ Implementado |
 | **Configuración** | Centraliza la conexión a DB, JWT, CORS y Sequelize CLI. | ✅ Implementado |
-| **Controlador** | Contiene la lógica de negocio. Recibe peticiones, procesa datos y responde. | ⬜ Pendiente |
-| **Rutas** | Define los endpoints de la API y los conecta con los controladores. | ⬜ Pendiente |
-| **Middleware** | Funciones intermedias para autenticación, validación y manejo de errores. | ⬜ Pendiente |
+| **Controlador** | Contiene la lógica de negocio. Recibe peticiones, procesa datos y responde. | ✅ Implementado |
+| **Rutas** | Define los endpoints de la API y los conecta con los controladores. | ✅ Implementado |
+| **Middleware** | Funciones intermedias para autenticación (JWT), roles (RBAC) y validación de errores descriptiva. | ✅ Implementado |
 
 ---
 
@@ -223,26 +224,21 @@ CORS_ORIGIN=http://localhost:5173
 | `dotenv` | Producción | Carga variables de entorno desde `.env`. |
 | `sequelize-cli` | Desarrollo | Herramienta CLI para migraciones y seeders. |
 
-### Pendientes de instalar (cuando se implementen controllers/routes)
+### Dependencias Agregadas (Rutas, Controllers, Auth)
 
 | Paquete | Propósito |
 |---------|-----------|
 | `express` | Framework web para crear la API REST. |
 | `cors` | Habilita Cross-Origin Resource Sharing. |
-| `jsonwebtoken` | Generación y verificación de tokens JWT. |
-| `bcryptjs` | Hash de contraseñas. |
-| `nodemon` (dev) | Reinicio automático del servidor en desarrollo. |
+| `jsonwebtoken` | Generación y verificación de tokens JWT (30 min expiración). |
+| `bcrypt` | Hash de contraseñas de usuarios y números de tarjetas bancarias. |
 
 ### Instalación
 
 ```bash
-# Dependencias actuales (ya instaladas)
-npm install sequelize mysql2 dotenv
+# Todas las dependencias (ORM, API y Seguridad)
+npm install sequelize mysql2 dotenv express cors jsonwebtoken bcrypt
 npm install --save-dev sequelize-cli
-
-# Dependencias futuras (instalar cuando se creen controllers/routes)
-npm install express cors jsonwebtoken bcryptjs
-npm install --save-dev nodemon
 ```
 
 ---
@@ -303,12 +299,16 @@ npx sequelize-cli db:migrate:undo:all
 
 ---
 
-## 🔐 Seguridad (Diseñada)
+## 🔐 Seguridad (Implementada Avanzada)
 
-- **Autenticación:** Basada en tokens JWT (por implementar).
-- **Contraseñas:** Campo `password_hash` en USUARIOS, preparado para bcrypt.
-- **Roles y Permisos:** Sistema RBAC con tabla pivote ROLES_PERMISOS.
-- **Auditoría:** Todas las acciones quedan registradas en `HISTORIAL_AUDITORIA` con FK SET NULL para preservar registros si se elimina el usuario.
+- **Autenticación (JWT):** `AuthController` maneja `/auth/login` (emite token de 30 min) y `/auth/register` (público, auto-asigna `SUPER_ADMIN` si la BD está vacía, o `CLIENTE` si ya hay usuarios).
+- **Control de Pertenencia (Ownership):** Implementación de `verificarPropiedad.js`. Si un `CLIENTE` intenta acceder por `:id` a una Cuenta, Transacción o Tarjeta, este middleware intercepta la petición y va a la BD para validar que él es el verdadero dueño. Además, los controladores (`GET /`) inyectan un filtro (`where: { idCliente: req.user.idCliente }`) automáticamente en las consultas de los clientes.
+- **Roles y Jerarquía (RBAC):** Middleware dinámico `verificarRol` protege todas las rutas (24 archivos).
+  - `SUPER_ADMIN` tiene acceso irrestricto absoluto a cualquier endpoint, sobreescribiendo arreglos de rutas.
+  - `ADMIN` no puede crear nuevos `SUPER_ADMIN` ni editar el rol de un `SUPER_ADMIN` existente (Reglas implementadas en `UsuarioController`).
+- **Bloqueos Físicos:** Se deshabilitaron los métodos `DELETE` en Transacciones, Movimientos y Historial, devolviendo un error 403 (normativa bancaria).
+- **Contraseñas y Datos Sensibles:** Uso estricto de `bcrypt` (SALT_ROUNDS = 10) para el campo `passwordHash` en `USUARIOS` y el número de tarjeta en `TARJETAS` mediante Hooks de Sequelize (`beforeCreate`, `beforeUpdate`).
+- **Manejo de Errores:** Todos los controladores devuelven mensajes de error detallados y descriptivos en español.
 
 ---
 

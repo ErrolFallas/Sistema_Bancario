@@ -5,6 +5,11 @@
 const express = require("express");
 const router = express.Router();
 
+const { autenticarToken } = require('../middlewares/autenticarToken');
+const { verificarRol } = require('../middlewares/verificarRol');
+const { verificarPropiedad } = require('../middlewares/verificarPropiedad');
+
+
 const {
   crearEmpleado,
   buscarEmpleados,
@@ -13,10 +18,10 @@ const {
   actualizarEmpleado,
 } = require("../controllers/EmpleadoController");
 
-router.post("/", crearEmpleado);
-router.get("/", buscarEmpleados);
-router.get("/:id", buscarEmpleadoId);
-router.delete("/:id", eliminarEmpleado);
-router.patch("/:id", actualizarEmpleado);
+router.post("/", autenticarToken, verificarRol('ADMIN'), crearEmpleado);
+router.get("/", autenticarToken, verificarRol('ADMIN'), buscarEmpleados);
+router.get("/:id", autenticarToken, verificarRol('ADMIN'), buscarEmpleadoId);
+router.delete("/:id", autenticarToken, verificarRol('ADMIN'), eliminarEmpleado);
+router.patch("/:id", autenticarToken, verificarRol('ADMIN'), actualizarEmpleado);
 
 module.exports = router;

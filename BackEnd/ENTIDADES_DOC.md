@@ -62,7 +62,7 @@ Los empleados son los operadores internos. A través de un usuario asociado, acc
 Representa las credenciales de acceso al sistema. Un usuario puede estar vinculado a un cliente (acceso banca en línea) o a un empleado (acceso administrativo), pero no a ambos.
 
 **Función en el sistema:**
-Es la puerta de entrada al sistema. Controla la autenticación (username + password_hash) y, mediante su rol, determina qué acciones puede realizar cada persona.
+Es la puerta de entrada al sistema. Controla la autenticación mediante un **hash de la contraseña (usando bcrypt)** y, a través de su rol y la generación de un **token JWT (expiración 30 min)**, determina qué acciones puede realizar cada persona. Soporta *soft delete* mediante el campo `activo`. Al registrarse de forma pública (`POST /auth/register`), el primer usuario del sistema obtiene automáticamente el rol `SUPER_ADMIN`, y los subsiguientes obtienen `CLIENTE`.
 
 **Relaciones:**
 - `Usuario → Rol` — N:1 (cada usuario tiene un rol asignado).
@@ -115,6 +115,7 @@ Representa las cuentas bancarias donde los clientes almacenan su dinero. Incluye
 
 **Función en el sistema:**
 Es el eje operativo financiero. Las transacciones mueven dinero entre cuentas, las tarjetas se emiten sobre cuentas, y los movimientos registran cada cambio de saldo.
+*Nota de implementación:* Al crear una cuenta, el sistema **valida obligatoriamente** que esté asociada a un `id_cliente` o `id_empleado`, y auto-genera el número de cuenta en formato `CR-YYYYMMDD-XXXX`.
 
 **Relaciones:**
 - `Cuenta → Banco` — N:1 (cada cuenta pertenece a un banco).
@@ -169,6 +170,7 @@ Representa los medios de pago físicos o virtuales asociados a una cuenta bancar
 
 **Función en el sistema:**
 Extiende la funcionalidad de una cuenta permitiendo pagos en comercios, retiros en cajeros y compras en línea. Cada tarjeta tiene un tipo, marca y estado.
+*Seguridad:* Por normativa bancaria, el número de la tarjeta no se guarda en texto plano; se utiliza un **hook de Sequelize para hashear (bcrypt)** el número automáticamente antes de guardarlo en la base de datos.
 
 **Relaciones:**
 - `Tarjeta → Cuenta` — N:1 (cada tarjeta está vinculada a una cuenta).

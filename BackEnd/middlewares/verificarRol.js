@@ -18,6 +18,11 @@ const verificarRol = (...rolesPermitidos) => {
 
     const rolUsuario = req.user.rol; // nombre del rol desde el JWT payload
 
+    // El SUPER_ADMIN tiene acceso global a todo
+    if (rolUsuario === 'SUPER_ADMIN') {
+      return next();
+    }
+
     if (!rolesPermitidos.includes(rolUsuario)) {
       return res.status(403).json({
         error: `Acceso restringido. Permisos insuficientes. Su rol actual es '${rolUsuario || 'ninguno'}', pero esta acción requiere estrictamente uno de los siguientes roles: [${rolesPermitidos.join(', ')}].`,

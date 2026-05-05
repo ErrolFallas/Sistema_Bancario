@@ -20,6 +20,15 @@ const crearUsuario = async (req, res) => {
       return res.status(400).json({ error: 'Error de validación: La contraseña es un campo obligatorio para crear un usuario. Por favor proporcione un valor válido.' });
     }
 
+    // --- LOGICA DE JERARQUÍA DE ROLES ---
+    if (req.body.idRol && req.user && req.user.rol === 'ADMIN') {
+      const rolSolicitado = await Rol.findByPk(req.body.idRol);
+      if (rolSolicitado && rolSolicitado.nombre === 'SUPER_ADMIN') {
+        return res.status(403).json({ error: 'Operación denegada: Un ADMIN no puede crear usuarios con privilegios de SUPER_ADMIN.' });
+      }
+    }
+    // -------------------------------------
+
     const hash = await bcrypt.hash(password, SALT_ROUNDS);
     const usuario = await Usuario.create({ ...resto, passwordHash: hash });
 
@@ -81,6 +90,22 @@ const actualizarUsuario = async (req, res) => {
     if (!usuario) {
       return res.status(404).json({ error: `Error de actualización: No se puede actualizar. No se encontró el usuario con ID '${req.params.id}'.` });
     }
+
+    // --- LOGICA DE JERARQUÍA DE ROLES ---
+    if (req.body.idRol) {
+      const rolSolicitado = await Rol.findByPk(req.body.idRol);
+      const rolActual = await Rol.findByPk(usuario.idRol);
+
+      if (req.user && req.user.rol === 'ADMIN') {
+        if (rolActual && rolActual.nombre === 'SUPER_ADMIN') {
+          return res.status(403).json({ error: 'Operación denegada: Un ADMIN no puede modificar a un SUPER_ADMIN.' });
+        }
+        if (rolSolicitado && rolSolicitado.nombre === 'SUPER_ADMIN') {
+          return res.status(403).json({ error: 'Operación denegada: Un ADMIN no puede promover a un usuario a SUPER_ADMIN.' });
+        }
+      }
+    }
+    // -------------------------------------
 
     // Re-hashear contraseña si viene nueva
     if (req.body.password) {

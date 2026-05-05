@@ -16,12 +16,17 @@ const crearPagoPrestamo = async (req, res) => {
 
 const buscarPagosPrestamo = async (req, res) => {
   try {
-    const pagos = await PagoPrestamo.findAll({
+    const opciones = {
       include: [
-        { model: Prestamo, as: "prestamo" },
+        { 
+          model: Prestamo, 
+          as: "prestamo",
+          where: req.user && req.user.rol === 'CLIENTE' ? { idCliente: req.user.idCliente } : {}
+        },
         { model: Transaccion, as: "transaccion" },
       ],
-    });
+    };
+    const pagos = await PagoPrestamo.findAll(opciones);
     return res.status(200).json(pagos);
   } catch (error) {
     return res.status(500).json({ error: 'Error interno del servidor al procesar la solicitud.', detalle: error.message });

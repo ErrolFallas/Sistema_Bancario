@@ -5,6 +5,11 @@
 const express = require("express");
 const router = express.Router();
 
+const { autenticarToken } = require('../middlewares/autenticarToken');
+const { verificarRol } = require('../middlewares/verificarRol');
+const { verificarPropiedad } = require('../middlewares/verificarPropiedad');
+
+
 const {
   crearPermiso,
   buscarPermisos,
@@ -13,10 +18,10 @@ const {
   actualizarPermiso,
 } = require("../controllers/PermisoController");
 
-router.post("/", crearPermiso);
-router.get("/", buscarPermisos);
-router.get("/:id", buscarPermisoId);
-router.delete("/:id", eliminarPermiso);
-router.patch("/:id", actualizarPermiso);
+router.post("/", autenticarToken, verificarRol('SUPER_ADMIN'), crearPermiso);
+router.get("/", autenticarToken, verificarRol('SUPER_ADMIN'), buscarPermisos);
+router.get("/:id", autenticarToken, verificarRol('SUPER_ADMIN'), buscarPermisoId);
+router.delete("/:id", autenticarToken, verificarRol('SUPER_ADMIN'), eliminarPermiso);
+router.patch("/:id", autenticarToken, verificarRol('SUPER_ADMIN'), actualizarPermiso);
 
 module.exports = router;
