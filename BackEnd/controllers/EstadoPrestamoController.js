@@ -1,0 +1,70 @@
+// ============================================
+// Controlador: EstadoPrestamoController
+// CRUD para la entidad EstadoPrestamo
+// ============================================
+
+const { EstadoPrestamo } = require("../models");
+
+const crearEstadoPrestamo = async (req, res) => {
+  try {
+    const estado = await EstadoPrestamo.create(req.body);
+    return res.status(201).json(estado);
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
+};
+
+const buscarEstadosPrestamo = async (req, res) => {
+  try {
+    const estados = await EstadoPrestamo.findAll();
+    return res.status(200).json(estados);
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+};
+
+const buscarEstadoPrestamoId = async (req, res) => {
+  try {
+    const estado = await EstadoPrestamo.findByPk(req.params.id);
+    if (!estado) {
+      return res.status(404).json({ error: "Estado de préstamo no encontrado" });
+    }
+    return res.status(200).json(estado);
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+};
+
+const actualizarEstadoPrestamo = async (req, res) => {
+  try {
+    const estado = await EstadoPrestamo.findByPk(req.params.id);
+    if (!estado) {
+      return res.status(404).json({ error: "Estado de préstamo no encontrado" });
+    }
+    await estado.update(req.body);
+    return res.status(200).json(estado);
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
+};
+
+const eliminarEstadoPrestamo = async (req, res) => {
+  try {
+    const estado = await EstadoPrestamo.findByPk(req.params.id);
+    if (!estado) {
+      return res.status(404).json({ error: "Estado de préstamo no encontrado" });
+    }
+    await estado.destroy();
+    return res.status(200).json({ mensaje: "Estado de préstamo eliminado correctamente" });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+};
+
+module.exports = {
+  crearEstadoPrestamo,
+  buscarEstadosPrestamo,
+  buscarEstadoPrestamoId,
+  actualizarEstadoPrestamo,
+  eliminarEstadoPrestamo,
+};
