@@ -17,7 +17,7 @@ const crearUsuario = async (req, res) => {
     const { password, ...resto } = req.body;
 
     if (!password) {
-      return res.status(400).json({ error: 'La contraseña es obligatoria.' });
+      return res.status(400).json({ error: 'Error de validación: La contraseña es un campo obligatorio para crear un usuario. Por favor proporcione un valor válido.' });
     }
 
     const hash = await bcrypt.hash(password, SALT_ROUNDS);
@@ -27,7 +27,7 @@ const crearUsuario = async (req, res) => {
     const { passwordHash: _, ...usuarioPublico } = usuario.toJSON();
     return res.status(201).json(usuarioPublico);
   } catch (error) {
-    return res.status(400).json({ error: error.message });
+    return res.status(400).json({ error: 'Error de validación en los datos enviados.', detalle: error.message });
   }
 };
 
@@ -46,7 +46,7 @@ const buscarUsuarios = async (req, res) => {
     });
     return res.status(200).json(usuarios);
   } catch (error) {
-    return res.status(500).json({ error: error.message });
+    return res.status(500).json({ error: 'Error interno del servidor al procesar la solicitud.', detalle: error.message });
   }
 };
 
@@ -64,11 +64,11 @@ const buscarUsuarioId = async (req, res) => {
       ],
     });
     if (!usuario) {
-      return res.status(404).json({ error: 'Usuario no encontrado.' });
+      return res.status(404).json({ error: `Error de búsqueda: No se encontró ningún usuario asociado al ID '${req.params.id}' en la base de datos.` });
     }
     return res.status(200).json(usuario);
   } catch (error) {
-    return res.status(500).json({ error: error.message });
+    return res.status(500).json({ error: 'Error interno del servidor al procesar la solicitud.', detalle: error.message });
   }
 };
 
@@ -79,7 +79,7 @@ const actualizarUsuario = async (req, res) => {
   try {
     const usuario = await Usuario.findByPk(req.params.id);
     if (!usuario) {
-      return res.status(404).json({ error: 'Usuario no encontrado.' });
+      return res.status(404).json({ error: `Error de actualización: No se puede actualizar. No se encontró el usuario con ID '${req.params.id}'.` });
     }
 
     // Re-hashear contraseña si viene nueva
@@ -93,7 +93,7 @@ const actualizarUsuario = async (req, res) => {
     const { passwordHash: _, ...actualizado } = usuario.toJSON();
     return res.status(200).json(actualizado);
   } catch (error) {
-    return res.status(400).json({ error: error.message });
+    return res.status(400).json({ error: 'Error de validación en los datos enviados.', detalle: error.message });
   }
 };
 
@@ -105,12 +105,12 @@ const eliminarUsuario = async (req, res) => {
   try {
     const usuario = await Usuario.findByPk(req.params.id);
     if (!usuario) {
-      return res.status(404).json({ error: 'Usuario no encontrado.' });
+      return res.status(404).json({ error: `Error de eliminación: No se puede eliminar. No se encontró el usuario con ID '${req.params.id}'.` });
     }
     await usuario.destroy();
     return res.status(200).json({ mensaje: 'Usuario eliminado correctamente.' });
   } catch (error) {
-    return res.status(500).json({ error: error.message });
+    return res.status(500).json({ error: 'Error interno del servidor al procesar la solicitud.', detalle: error.message });
   }
 };
 
@@ -125,11 +125,11 @@ const desactivarCuenta = async (req, res) => {
 
     const usuario = await Usuario.findByPk(idUsuarioToken);
     if (!usuario) {
-      return res.status(404).json({ error: 'Usuario no encontrado.' });
+      return res.status(404).json({ error: 'Error: No se encontró la información de su cuenta. Asegúrese de tener una sesión válida iniciada.' });
     }
 
     if (!usuario.activo) {
-      return res.status(400).json({ error: 'La cuenta ya está desactivada.' });
+      return res.status(400).json({ error: 'Error de estado: Su cuenta ya se encuentra desactivada actualmente.' });
     }
 
     // Soft delete: cambiar activo a false, NO borrar registro
@@ -139,7 +139,7 @@ const desactivarCuenta = async (req, res) => {
       mensaje: 'Cuenta desactivada exitosamente. Ya no podrá iniciar sesión.',
     });
   } catch (error) {
-    return res.status(500).json({ error: error.message });
+    return res.status(500).json({ error: 'Error interno del servidor al procesar la solicitud.', detalle: error.message });
   }
 };
 

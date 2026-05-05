@@ -17,7 +17,7 @@ const autenticarToken = (req, res, next) => {
     : null;
 
   if (!token) {
-    return res.status(401).json({ error: 'Acceso denegado. Token no proporcionado.' });
+    return res.status(401).json({ error: 'Acceso denegado. Se requiere un Token de autenticación en los headers (Authorization: Bearer <token>).' });
   }
 
   try {
@@ -26,9 +26,9 @@ const autenticarToken = (req, res, next) => {
     next();
   } catch (err) {
     if (err.name === 'TokenExpiredError') {
-      return res.status(401).json({ error: 'Token expirado. Inicie sesión nuevamente.' });
+      return res.status(401).json({ error: 'Acceso denegado. Su Token ha expirado, por favor inicie sesión nuevamente.' });
     }
-    return res.status(403).json({ error: 'Token inválido.' });
+    return res.status(403).json({ error: 'Acceso denegado. El Token proporcionado es inválido o está corrupto.' });
   }
 };
 

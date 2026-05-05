@@ -17,7 +17,7 @@ const login = async (req, res) => {
 
     // 1. Campos obligatorios
     if (!username || !password) {
-      return res.status(400).json({ error: 'Username y contraseña son obligatorios.' });
+      return res.status(400).json({ error: 'Error de validación: Los campos "username" y "password" son estrictamente obligatorios para iniciar sesión.' });
     }
 
     // 2. Buscar usuario con su rol
@@ -27,18 +27,18 @@ const login = async (req, res) => {
     });
 
     if (!usuario) {
-      return res.status(401).json({ error: 'Credenciales incorrectas.' });
+      return res.status(401).json({ error: 'Error de autenticación: El nombre de usuario ingresado no existe en el sistema.' });
     }
 
     // 3. Verificar si la cuenta está activa
     if (!usuario.activo) {
-      return res.status(403).json({ error: 'Cuenta inactiva. Contacte al administrador.' });
+      return res.status(403).json({ error: 'Acceso denegado: Su cuenta se encuentra inactiva o ha sido suspendida. Por favor, contacte al administrador del sistema.' });
     }
 
     // 4. Comparar contraseña con hash bcrypt
     const esValida = await bcrypt.compare(password, usuario.passwordHash);
     if (!esValida) {
-      return res.status(401).json({ error: 'Credenciales incorrectas.' });
+      return res.status(401).json({ error: 'Error de autenticación: La contraseña ingresada es incorrecta.' });
     }
 
     // 5. Construir payload del JWT
@@ -67,7 +67,7 @@ const login = async (req, res) => {
       },
     });
   } catch (error) {
-    return res.status(500).json({ error: error.message });
+    return res.status(500).json({ error: 'Error interno del servidor al procesar la solicitud.', detalle: error.message });
   }
 };
 
@@ -84,12 +84,12 @@ const me = async (req, res) => {
     });
 
     if (!usuario) {
-      return res.status(404).json({ error: 'Usuario no encontrado.' });
+      return res.status(404).json({ error: 'Error: No se pudo encontrar la información de su usuario en la base de datos. Verifique que su cuenta exista.' });
     }
 
     return res.status(200).json(usuario);
   } catch (error) {
-    return res.status(500).json({ error: error.message });
+    return res.status(500).json({ error: 'Error interno del servidor al procesar la solicitud.', detalle: error.message });
   }
 };
 

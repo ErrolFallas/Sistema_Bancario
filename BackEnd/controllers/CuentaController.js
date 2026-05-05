@@ -27,7 +27,7 @@ const crearCuenta = async (req, res) => {
     // ── Validación obligatoria ──────────────────────────────────────
     if (!idCliente && !idEmpleado) {
       return res.status(400).json({
-        error: 'Se requiere al menos id_cliente o id_empleado para crear una cuenta.',
+        error: 'Error de validación: Se requiere obligatoriamente enviar el "id_cliente" o el "id_empleado" para poder crear una cuenta y asociarla.',
       });
     }
 
@@ -55,7 +55,7 @@ const crearCuenta = async (req, res) => {
       idEmpleado: idEmpleado || null,
     });
   } catch (error) {
-    return res.status(400).json({ error: error.message });
+    return res.status(400).json({ error: 'Error de validación en los datos enviados.', detalle: error.message });
   }
 };
 
@@ -73,7 +73,7 @@ const buscarCuentas = async (req, res) => {
     });
     return res.status(200).json(cuentas);
   } catch (error) {
-    return res.status(500).json({ error: error.message });
+    return res.status(500).json({ error: 'Error interno del servidor al procesar la solicitud.', detalle: error.message });
   }
 };
 
@@ -90,11 +90,11 @@ const buscarCuentaId = async (req, res) => {
       ],
     });
     if (!cuenta) {
-      return res.status(404).json({ error: "Cuenta no encontrada" });
+      return res.status(404).json({ error: `Error de búsqueda: No se encontró ninguna cuenta asociada al ID '${req.params.id}' en el sistema.` });
     }
     return res.status(200).json(cuenta);
   } catch (error) {
-    return res.status(500).json({ error: error.message });
+    return res.status(500).json({ error: 'Error interno del servidor al procesar la solicitud.', detalle: error.message });
   }
 };
 
@@ -105,12 +105,12 @@ const actualizarCuenta = async (req, res) => {
   try {
     const cuenta = await Cuenta.findByPk(req.params.id);
     if (!cuenta) {
-      return res.status(404).json({ error: "Cuenta no encontrada" });
+      return res.status(404).json({ error: `Error de actualización: No se puede actualizar. No se encontró la cuenta con ID '${req.params.id}'.` });
     }
     await cuenta.update(req.body);
     return res.status(200).json(cuenta);
   } catch (error) {
-    return res.status(400).json({ error: error.message });
+    return res.status(400).json({ error: 'Error de validación en los datos enviados.', detalle: error.message });
   }
 };
 
@@ -121,12 +121,12 @@ const eliminarCuenta = async (req, res) => {
   try {
     const cuenta = await Cuenta.findByPk(req.params.id);
     if (!cuenta) {
-      return res.status(404).json({ error: "Cuenta no encontrada" });
+      return res.status(404).json({ error: `Error de eliminación: No se puede eliminar. No se encontró la cuenta con ID '${req.params.id}'.` });
     }
     await cuenta.destroy();
     return res.status(200).json({ mensaje: "Cuenta eliminada correctamente" });
   } catch (error) {
-    return res.status(500).json({ error: error.message });
+    return res.status(500).json({ error: 'Error interno del servidor al procesar la solicitud.', detalle: error.message });
   }
 };
 

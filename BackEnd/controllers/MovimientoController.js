@@ -10,7 +10,7 @@ const crearMovimiento = async (req, res) => {
     const movimiento = await Movimiento.create(req.body);
     return res.status(201).json(movimiento);
   } catch (error) {
-    return res.status(400).json({ error: error.message });
+    return res.status(400).json({ error: 'Error de validación en los datos enviados.', detalle: error.message });
   }
 };
 
@@ -24,7 +24,7 @@ const buscarMovimientos = async (req, res) => {
     });
     return res.status(200).json(movimientos);
   } catch (error) {
-    return res.status(500).json({ error: error.message });
+    return res.status(500).json({ error: 'Error interno del servidor al procesar la solicitud.', detalle: error.message });
   }
 };
 
@@ -37,11 +37,11 @@ const buscarMovimientoId = async (req, res) => {
       ],
     });
     if (!movimiento) {
-      return res.status(404).json({ error: "Movimiento no encontrado" });
+      return res.status(404).json({ error: `Error de búsqueda: No se encontró el registro de Movimiento con el ID proporcionado en la base de datos.` });
     }
     return res.status(200).json(movimiento);
   } catch (error) {
-    return res.status(500).json({ error: error.message });
+    return res.status(500).json({ error: 'Error interno del servidor al procesar la solicitud.', detalle: error.message });
   }
 };
 
@@ -49,12 +49,12 @@ const actualizarMovimiento = async (req, res) => {
   try {
     const movimiento = await Movimiento.findByPk(req.params.id);
     if (!movimiento) {
-      return res.status(404).json({ error: "Movimiento no encontrado" });
+      return res.status(404).json({ error: `Error de búsqueda: No se encontró el registro de Movimiento con el ID proporcionado en la base de datos.` });
     }
     await movimiento.update(req.body);
     return res.status(200).json(movimiento);
   } catch (error) {
-    return res.status(400).json({ error: error.message });
+    return res.status(400).json({ error: 'Error de validación en los datos enviados.', detalle: error.message });
   }
 };
 
@@ -62,12 +62,12 @@ const eliminarMovimiento = async (req, res) => {
   try {
     const movimiento = await Movimiento.findByPk(req.params.id);
     if (!movimiento) {
-      return res.status(404).json({ error: "Movimiento no encontrado" });
+      return res.status(404).json({ error: `Error de búsqueda: No se encontró el registro de Movimiento con el ID proporcionado en la base de datos.` });
     }
     await movimiento.destroy();
     return res.status(200).json({ mensaje: "Movimiento eliminado correctamente" });
   } catch (error) {
-    return res.status(500).json({ error: error.message });
+    return res.status(500).json({ error: 'Error interno del servidor al procesar la solicitud.', detalle: error.message });
   }
 };
 

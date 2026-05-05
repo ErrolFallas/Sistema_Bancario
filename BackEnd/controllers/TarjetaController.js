@@ -10,7 +10,7 @@ const crearTarjeta = async (req, res) => {
     const tarjeta = await Tarjeta.create(req.body);
     return res.status(201).json(tarjeta);
   } catch (error) {
-    return res.status(400).json({ error: error.message });
+    return res.status(400).json({ error: 'Error de validación en los datos enviados.', detalle: error.message });
   }
 };
 
@@ -26,7 +26,7 @@ const buscarTarjetas = async (req, res) => {
     });
     return res.status(200).json(tarjetas);
   } catch (error) {
-    return res.status(500).json({ error: error.message });
+    return res.status(500).json({ error: 'Error interno del servidor al procesar la solicitud.', detalle: error.message });
   }
 };
 
@@ -41,11 +41,11 @@ const buscarTarjetaId = async (req, res) => {
       ],
     });
     if (!tarjeta) {
-      return res.status(404).json({ error: "Tarjeta no encontrada" });
+      return res.status(404).json({ error: `Error de búsqueda: No se encontró el registro de Tarjeta con el ID proporcionado en la base de datos.` });
     }
     return res.status(200).json(tarjeta);
   } catch (error) {
-    return res.status(500).json({ error: error.message });
+    return res.status(500).json({ error: 'Error interno del servidor al procesar la solicitud.', detalle: error.message });
   }
 };
 
@@ -53,12 +53,12 @@ const actualizarTarjeta = async (req, res) => {
   try {
     const tarjeta = await Tarjeta.findByPk(req.params.id);
     if (!tarjeta) {
-      return res.status(404).json({ error: "Tarjeta no encontrada" });
+      return res.status(404).json({ error: `Error de búsqueda: No se encontró el registro de Tarjeta con el ID proporcionado en la base de datos.` });
     }
     await tarjeta.update(req.body);
     return res.status(200).json(tarjeta);
   } catch (error) {
-    return res.status(400).json({ error: error.message });
+    return res.status(400).json({ error: 'Error de validación en los datos enviados.', detalle: error.message });
   }
 };
 
@@ -66,12 +66,12 @@ const eliminarTarjeta = async (req, res) => {
   try {
     const tarjeta = await Tarjeta.findByPk(req.params.id);
     if (!tarjeta) {
-      return res.status(404).json({ error: "Tarjeta no encontrada" });
+      return res.status(404).json({ error: `Error de búsqueda: No se encontró el registro de Tarjeta con el ID proporcionado en la base de datos.` });
     }
     await tarjeta.destroy();
     return res.status(200).json({ mensaje: "Tarjeta eliminada correctamente" });
   } catch (error) {
-    return res.status(500).json({ error: error.message });
+    return res.status(500).json({ error: 'Error interno del servidor al procesar la solicitud.', detalle: error.message });
   }
 };
 

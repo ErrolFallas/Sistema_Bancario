@@ -10,7 +10,7 @@ const crearPrestamo = async (req, res) => {
     const prestamo = await Prestamo.create(req.body);
     return res.status(201).json(prestamo);
   } catch (error) {
-    return res.status(400).json({ error: error.message });
+    return res.status(400).json({ error: 'Error de validación en los datos enviados.', detalle: error.message });
   }
 };
 
@@ -25,7 +25,7 @@ const buscarPrestamos = async (req, res) => {
     });
     return res.status(200).json(prestamos);
   } catch (error) {
-    return res.status(500).json({ error: error.message });
+    return res.status(500).json({ error: 'Error interno del servidor al procesar la solicitud.', detalle: error.message });
   }
 };
 
@@ -39,11 +39,11 @@ const buscarPrestamoId = async (req, res) => {
       ],
     });
     if (!prestamo) {
-      return res.status(404).json({ error: "Préstamo no encontrado" });
+      return res.status(404).json({ error: `Error de búsqueda: No se encontró el registro de Préstamo con el ID proporcionado en la base de datos.` });
     }
     return res.status(200).json(prestamo);
   } catch (error) {
-    return res.status(500).json({ error: error.message });
+    return res.status(500).json({ error: 'Error interno del servidor al procesar la solicitud.', detalle: error.message });
   }
 };
 
@@ -51,12 +51,12 @@ const actualizarPrestamo = async (req, res) => {
   try {
     const prestamo = await Prestamo.findByPk(req.params.id);
     if (!prestamo) {
-      return res.status(404).json({ error: "Préstamo no encontrado" });
+      return res.status(404).json({ error: `Error de búsqueda: No se encontró el registro de Préstamo con el ID proporcionado en la base de datos.` });
     }
     await prestamo.update(req.body);
     return res.status(200).json(prestamo);
   } catch (error) {
-    return res.status(400).json({ error: error.message });
+    return res.status(400).json({ error: 'Error de validación en los datos enviados.', detalle: error.message });
   }
 };
 
@@ -64,12 +64,12 @@ const eliminarPrestamo = async (req, res) => {
   try {
     const prestamo = await Prestamo.findByPk(req.params.id);
     if (!prestamo) {
-      return res.status(404).json({ error: "Préstamo no encontrado" });
+      return res.status(404).json({ error: `Error de búsqueda: No se encontró el registro de Préstamo con el ID proporcionado en la base de datos.` });
     }
     await prestamo.destroy();
     return res.status(200).json({ mensaje: "Préstamo eliminado correctamente" });
   } catch (error) {
-    return res.status(500).json({ error: error.message });
+    return res.status(500).json({ error: 'Error interno del servidor al procesar la solicitud.', detalle: error.message });
   }
 };
 

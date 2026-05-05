@@ -13,14 +13,14 @@
 const verificarRol = (...rolesPermitidos) => {
   return (req, res, next) => {
     if (!req.user) {
-      return res.status(401).json({ error: 'No autenticado.' });
+      return res.status(401).json({ error: 'Acceso denegado. No se encontró información de autenticación. Asegúrese de enviar el token JWT.' });
     }
 
     const rolUsuario = req.user.rol; // nombre del rol desde el JWT payload
 
     if (!rolesPermitidos.includes(rolUsuario)) {
       return res.status(403).json({
-        error: `Acceso restringido. Se requiere uno de los roles: [${rolesPermitidos.join(', ')}].`,
+        error: `Acceso restringido. Permisos insuficientes. Su rol actual es '${rolUsuario || 'ninguno'}', pero esta acción requiere estrictamente uno de los siguientes roles: [${rolesPermitidos.join(', ')}].`,
       });
     }
 
