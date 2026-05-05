@@ -3,23 +3,72 @@
 // CRUD para la entidad Cuenta
 // ============================================
 
-const { Cuenta, Banco, TipoCuenta } = require("../models");
+const { Cuenta, Banco, TipoCuenta, ClienteCuenta, Cliente } = require("../models");
 
+// ============================================
+// Función auxiliar: generar número de cuenta automático
+// Formato: CR-YYYYMMDD-XXXX (ej: CR-20260505-4821)
+// ============================================
+const generarNumeroCuenta = () => {
+  const hoy = new Date();
+  const fecha = hoy.toISOString().slice(0, 10).replace(/-/g, '');
+  const aleatorio = Math.floor(1000 + Math.random() * 9000); // 4 dígitos
+  return `CR-${fecha}-${aleatorio}`;
+};
+
+// ============================================
+// POST /cuentas — Crear cuenta
+// Regla: DEBE venir id_cliente o id_empleado
+// ============================================
 const crearCuenta = async (req, res) => {
   try {
-    const cuenta = await Cuenta.create(req.body);
-    return res.status(201).json(cuenta);
+    const { idCliente, idEmpleado, ...datosCuenta } = req.body;
+
+    // ── Validación obligatoria ──────────────────────────────────────
+    if (!idCliente && !idEmpleado) {
+      return res.status(400).json({
+        error: 'Se requiere al menos id_cliente o id_empleado para crear una cuenta.',
+      });
+    }
+
+    // ── Auto-generar número de cuenta si no viene en el body ────────
+    if (!datosCuenta.numeroCuenta) {
+      datosCuenta.numeroCuenta = generarNumeroCuenta();
+    }
+
+    // ── Crear la cuenta ─────────────────────────────────────────────
+    const cuenta = await Cuenta.create(datosCuenta);
+
+    // ── Si viene id_cliente, registrar en tabla intermedia ──────────
+    if (idCliente) {
+      await ClienteCuenta.create({
+        idCuenta: cuenta.idCuenta,
+        idCliente: idCliente,
+      });
+    }
+
+    // ── Respuesta con número de cuenta generado ─────────────────────
+    return res.status(201).json({
+      ...cuenta.toJSON(),
+      numeroCuenta: cuenta.numeroCuenta,
+      idCliente: idCliente || null,
+      idEmpleado: idEmpleado || null,
+    });
   } catch (error) {
     return res.status(400).json({ error: error.message });
   }
 };
 
+// ============================================
+// GET /cuentas — Listar todas las cuentas
+// ============================================
 const buscarCuentas = async (req, res) => {
   try {
     const cuentas = await Cuenta.findAll({
       include: [
         { model: Banco, as: "banco" },
         { model: TipoCuenta, as: "tipoCuenta" },
+        { model: Cliente, as: "clientes" },
       ],
     });
     return res.status(200).json(cuentas);
@@ -28,12 +77,16 @@ const buscarCuentas = async (req, res) => {
   }
 };
 
+// ============================================
+// GET /cuentas/:id — Buscar cuenta por ID
+// ============================================
 const buscarCuentaId = async (req, res) => {
   try {
     const cuenta = await Cuenta.findByPk(req.params.id, {
       include: [
         { model: Banco, as: "banco" },
         { model: TipoCuenta, as: "tipoCuenta" },
+        { model: Cliente, as: "clientes" },
       ],
     });
     if (!cuenta) {
@@ -45,6 +98,9 @@ const buscarCuentaId = async (req, res) => {
   }
 };
 
+// ============================================
+// PATCH /cuentas/:id — Actualizar cuenta
+// ============================================
 const actualizarCuenta = async (req, res) => {
   try {
     const cuenta = await Cuenta.findByPk(req.params.id);
@@ -58,6 +114,9 @@ const actualizarCuenta = async (req, res) => {
   }
 };
 
+// ============================================
+// DELETE /cuentas/:id — Eliminar cuenta
+// ============================================
 const eliminarCuenta = async (req, res) => {
   try {
     const cuenta = await Cuenta.findByPk(req.params.id);

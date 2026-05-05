@@ -31,6 +31,9 @@ const estadoTransaccionRoute = require("./routes/EstadoTransaccionRoute");
 const canalRoute = require("./routes/CanalRoute");
 const estadoPrestamoRoute = require("./routes/EstadoPrestamoRoute");
 
+// Autenticación
+const authRoute = require("./routes/AuthRoute");
+
 // Entidades principales
 const bancoRoute = require("./routes/BancoRoute");
 const clienteRoute = require("./routes/ClienteRoute");
@@ -61,6 +64,9 @@ app.use("/tipos-transaccion", tipoTransaccionRoute);
 app.use("/estados-transaccion", estadoTransaccionRoute);
 app.use("/canales", canalRoute);
 app.use("/estados-prestamo", estadoPrestamoRoute);
+
+// Autenticación (pública)
+app.use("/auth", authRoute);
 
 // Entidades principales
 app.use("/bancos", bancoRoute);

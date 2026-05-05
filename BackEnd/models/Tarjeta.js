@@ -4,6 +4,9 @@
 // ============================================
 
 const { DataTypes } = require('sequelize');
+const bcrypt = require('bcrypt');
+
+const SALT_ROUNDS = 10;
 
 module.exports = (sequelize) => {
   const Tarjeta = sequelize.define('Tarjeta', {
@@ -70,6 +73,20 @@ module.exports = (sequelize) => {
     freezeTableName: true,
     createdAt: 'created_at',
     updatedAt: 'updated_at',
+    hooks: {
+      // Hashear número de tarjeta antes de insertar
+      beforeCreate: async (tarjeta) => {
+        if (tarjeta.numeroTarjeta) {
+          tarjeta.numeroTarjeta = await bcrypt.hash(tarjeta.numeroTarjeta, SALT_ROUNDS);
+        }
+      },
+      // Hashear número de tarjeta si fue modificado en un update
+      beforeUpdate: async (tarjeta) => {
+        if (tarjeta.changed('numeroTarjeta')) {
+          tarjeta.numeroTarjeta = await bcrypt.hash(tarjeta.numeroTarjeta, SALT_ROUNDS);
+        }
+      },
+    },
   });
 
   return Tarjeta;

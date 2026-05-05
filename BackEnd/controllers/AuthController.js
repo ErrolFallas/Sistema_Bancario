@@ -1,0 +1,96 @@
+// ============================================
+// Controller: AuthController
+// Responsabilidad única: autenticación y JWT
+// ============================================
+
+const bcrypt   = require('bcrypt');
+const jwt      = require('jsonwebtoken');
+const { Usuario, Rol } = require('../models');
+
+// ============================================
+// POST /auth/login
+// Valida credenciales y emite un JWT (30 min)
+// ============================================
+const login = async (req, res) => {
+  try {
+    const { username, password } = req.body;
+
+    // 1. Campos obligatorios
+    if (!username || !password) {
+      return res.status(400).json({ error: 'Username y contraseña son obligatorios.' });
+    }
+
+    // 2. Buscar usuario con su rol
+    const usuario = await Usuario.findOne({
+      where: { username },
+      include: [{ model: Rol, as: 'rol' }],
+    });
+
+    if (!usuario) {
+      return res.status(401).json({ error: 'Credenciales incorrectas.' });
+    }
+
+    // 3. Verificar si la cuenta está activa
+    if (!usuario.activo) {
+      return res.status(403).json({ error: 'Cuenta inactiva. Contacte al administrador.' });
+    }
+
+    // 4. Comparar contraseña con hash bcrypt
+    const esValida = await bcrypt.compare(password, usuario.passwordHash);
+    if (!esValida) {
+      return res.status(401).json({ error: 'Credenciales incorrectas.' });
+    }
+
+    // 5. Construir payload del JWT
+    const payload = {
+      idUsuario : usuario.idUsuario,
+      username  : usuario.username,
+      rol       : usuario.rol ? usuario.rol.nombre : null,
+      activo    : usuario.activo,
+    };
+
+    // 6. Firmar token — 30 minutos de expiración
+    const token = jwt.sign(payload, process.env.JWT_SECRET, {
+      expiresIn: '30m',
+    });
+
+    // 7. Respuesta — nunca incluir passwordHash
+    return res.status(200).json({
+      mensaje   : 'Login exitoso.',
+      token,
+      expiresIn : '30 minutos',
+      usuario: {
+        idUsuario : usuario.idUsuario,
+        username  : usuario.username,
+        rol       : payload.rol,
+        activo    : usuario.activo,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+};
+
+// ============================================
+// GET /auth/me
+// Retorna información del usuario autenticado
+// (requiere autenticarToken middleware)
+// ============================================
+const me = async (req, res) => {
+  try {
+    const usuario = await Usuario.findByPk(req.user.idUsuario, {
+      attributes: { exclude: ['passwordHash'] },
+      include: [{ model: Rol, as: 'rol' }],
+    });
+
+    if (!usuario) {
+      return res.status(404).json({ error: 'Usuario no encontrado.' });
+    }
+
+    return res.status(200).json(usuario);
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+};
+
+module.exports = { login, me };
