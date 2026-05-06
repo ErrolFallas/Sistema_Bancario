@@ -113,10 +113,13 @@ const GestionRoles = () => {
     }
   };
 
+  // ── Roles Base Protegidos ────────────────────────────────
+  const rolesBase = ['SUPER_ADMIN', 'ADMIN', 'GERENTE', 'EMPLEADO', 'CLIENTE'];
+
   // ── Confirmar Eliminación (Modal) ────────────────────────
   const abrirModalEliminar = (rol) => {
-    if (rol.nombre.toUpperCase() === 'SUPER_ADMIN') {
-      setError("Por razones de seguridad, el rol SUPER_ADMIN no puede ser eliminado del sistema.");
+    if (rolesBase.includes(rol.nombre.toUpperCase())) {
+      setError(`Operación denegada: El rol '${rol.nombre}' es un rol base del sistema y no puede ser eliminado.`);
       return;
     }
     setError('');
@@ -134,9 +137,9 @@ const GestionRoles = () => {
   const handleConfirmarEliminacion = async () => {
     if (!rolAEliminar) return;
 
-    if (rolAEliminar.nombre.toUpperCase() === 'SUPER_ADMIN') {
+    if (rolesBase.includes(rolAEliminar.nombre.toUpperCase())) {
       cerrarModal();
-      setError("Operación rechazada: No se puede eliminar el rol SUPER_ADMIN.");
+      setError(`Operación rechazada: No se puede eliminar el rol base '${rolAEliminar.nombre}'.`);
       return;
     }
 
@@ -287,7 +290,7 @@ const GestionRoles = () => {
             <tbody>
               {roles.map(rol => {
                 const nombreUpper = rol.nombre.toUpperCase();
-                const esSuperAdmin = nombreUpper === 'SUPER_ADMIN';
+                const esRolBase = rolesBase.includes(nombreUpper);
 
                 return (
                   <tr key={rol.idRol}>
@@ -307,14 +310,14 @@ const GestionRoles = () => {
                       }
                     </td>
                     <td>
-                      {esSuperAdmin 
+                      {esRolBase 
                         ? <span className="badge badge-protegido">👑 Sistema</span>
-                        : <span className="badge badge-admin">Rol</span>
+                        : <span className="badge badge-admin">Custom</span>
                       }
                     </td>
                     <td>
                       {/* LÓGICA DE VISIBILIDAD DE BOTÓN ELIMINAR */}
-                      {esSuperAdmin ? (
+                      {esRolBase ? (
                         <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Indispensable</span>
                       ) : (
                         <button className="btn-danger" onClick={() => abrirModalEliminar(rol)}>

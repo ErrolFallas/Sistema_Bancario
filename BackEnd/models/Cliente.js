@@ -35,13 +35,7 @@ module.exports = (sequelize) => {
         notEmpty: { msg: 'La cédula del cliente es obligatoria' },
       },
     },
-    email: {
-      type: DataTypes.STRING(100),
-      allowNull: true,
-      validate: {
-        isEmail: { msg: 'El email debe tener un formato válido' },
-      },
-    },
+
     telefono: {
       type: DataTypes.STRING(20),
       allowNull: true,

@@ -1,10 +1,29 @@
 import { Link, useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import bancoService from '../services/bancoService';
 import '../css/navbar.css';
 
 const Navbar = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const [nombreBanco, setNombreBanco] = useState('Cargando Core...');
+
+  useEffect(() => {
+    const fetchBanco = async () => {
+      try {
+        const bancos = await bancoService.getAll();
+        if (bancos && bancos.length > 0) {
+          setNombreBanco(bancos[0].nombre);
+        } else {
+          setNombreBanco('Sistema Bancario');
+        }
+      } catch (error) {
+        setNombreBanco('Sistema Bancario');
+      }
+    };
+    fetchBanco();
+  }, []);
 
   const handleLogout = async () => {
     try {
@@ -22,7 +41,7 @@ const Navbar = () => {
   return (
     <nav className="navbar">
       <div className="navbar-brand">
-        <Link to="/">🏦 Sistema Bancario</Link>
+        <Link to="/">🏦 {nombreBanco}</Link>
       </div>
 
       <div className="navbar-menu">

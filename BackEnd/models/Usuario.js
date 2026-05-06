@@ -25,6 +25,14 @@ module.exports = (sequelize) => {
         },
       },
     },
+    email: {
+      type: DataTypes.STRING(100),
+      allowNull: true,
+      unique: true,
+      validate: {
+        isEmail: { msg: 'El email debe tener un formato válido' },
+      },
+    },
     passwordHash: {
       type: DataTypes.STRING(255),
       allowNull: false,

@@ -28,11 +28,11 @@ const crearUsuarioCompleto = async (req, res) => {
   try {
     const {
       // Datos del usuario
-      username, password, idRol,
+      username, password, idRol, usuarioEmail,
       // Datos del cliente (solo si rol = CLIENTE)
-      clienteNombre, clienteApellido, clienteCedula, clienteEmail, clienteTelefono, clienteDireccion,
+      clienteNombre, clienteApellido, clienteCedula, clienteTelefono, clienteDireccion,
       // Datos del empleado (solo si rol = EMPLEADO o GERENTE)
-      empleadoNombre, empleadoApellido, empleadoPuesto, empleadoIdBanco,
+      empleadoNombre, empleadoApellido, empleadoTelefono, empleadoIdBanco,
     } = req.body;
 
     // ── VALIDACIONES BASE ──────────────────────────────────────────
@@ -42,10 +42,19 @@ const crearUsuarioCompleto = async (req, res) => {
     }
 
     // Verificar si el username ya existe
-    const existe = await Usuario.findOne({ where: { username }, transaction: t });
-    if (existe) {
+    const existeUsername = await Usuario.findOne({ where: { username }, transaction: t });
+    if (existeUsername) {
       await t.rollback();
-      return res.status(400).json({ error: 'El nombre de usuario ya está en uso.' });
+      return res.status(400).json({ error: 'El nombre de usuario ya está en uso. Por favor elija otro.' });
+    }
+
+    // Verificar si el email de usuario ya existe
+    if (usuarioEmail) {
+      const existeEmail = await Usuario.findOne({ where: { email: usuarioEmail }, transaction: t });
+      if (existeEmail) {
+        await t.rollback();
+        return res.status(400).json({ error: 'El email del usuario ya está registrado en el sistema.' });
+      }
     }
 
     // Obtener el rol solicitado
@@ -81,7 +90,6 @@ const crearUsuarioCompleto = async (req, res) => {
         nombre: clienteNombre,
         apellido: clienteApellido,
         cedula: clienteCedula,
-        email: clienteEmail || null,
         telefono: clienteTelefono || null,
         direccion: clienteDireccion || null,
       }, { transaction: t });
@@ -117,7 +125,7 @@ const crearUsuarioCompleto = async (req, res) => {
       const empleado = await Empleado.create({
         nombre: empleadoNombre,
         apellido: empleadoApellido,
-        puesto: empleadoPuesto || null,
+        telefono: empleadoTelefono || null,
         idBanco: empleadoIdBanco,
       }, { transaction: t });
 
@@ -144,6 +152,7 @@ const crearUsuarioCompleto = async (req, res) => {
     const usuario = await Usuario.create({
       username,
       passwordHash,
+      email: usuarioEmail || null,
       cuentaActiva: true,
       idRol,
       idCliente,

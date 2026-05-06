@@ -27,14 +27,9 @@ module.exports = (sequelize) => {
         notEmpty: { msg: 'El apellido del empleado es obligatorio' },
       },
     },
-    puesto: {
-      type: DataTypes.STRING(100),
+    telefono: {
+      type: DataTypes.STRING(20),
       allowNull: true,
-    },
-    activo: {
-      type: DataTypes.BOOLEAN,
-      allowNull: false,
-      defaultValue: true,
     },
     idBanco: {
       type: DataTypes.INTEGER,

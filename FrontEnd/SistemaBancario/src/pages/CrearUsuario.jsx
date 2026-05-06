@@ -26,18 +26,18 @@ const CrearUsuario = () => {
   const [formData, setFormData] = useState({
     username: '',
     password: '',
+    usuarioEmail: '',
     idRol: '',
     // Campos de Cliente
     clienteNombre: '',
     clienteApellido: '',
     clienteCedula: '',
-    clienteEmail: '',
     clienteTelefono: '',
     clienteDireccion: '',
     // Campos de Empleado
     empleadoNombre: '',
     empleadoApellido: '',
-    empleadoPuesto: '',
+    empleadoTelefono: '',
     empleadoIdBanco: '',
   });
 
@@ -132,11 +132,14 @@ const CrearUsuario = () => {
         idRol: Number(formData.idRol),
       };
 
+      if (formData.usuarioEmail.trim()) {
+        payload.usuarioEmail = formData.usuarioEmail.trim();
+      }
+
       if (mostrarCamposCliente) {
         payload.clienteNombre = formData.clienteNombre.trim();
         payload.clienteApellido = formData.clienteApellido.trim();
         payload.clienteCedula = formData.clienteCedula.trim();
-        if (formData.clienteEmail.trim()) payload.clienteEmail = formData.clienteEmail.trim();
         if (formData.clienteTelefono.trim()) payload.clienteTelefono = formData.clienteTelefono.trim();
         if (formData.clienteDireccion.trim()) payload.clienteDireccion = formData.clienteDireccion.trim();
       }
@@ -145,7 +148,7 @@ const CrearUsuario = () => {
         payload.empleadoNombre = formData.empleadoNombre.trim();
         payload.empleadoApellido = formData.empleadoApellido.trim();
         payload.empleadoIdBanco = Number(formData.empleadoIdBanco);
-        if (formData.empleadoPuesto.trim()) payload.empleadoPuesto = formData.empleadoPuesto.trim();
+        if (formData.empleadoTelefono.trim()) payload.empleadoTelefono = formData.empleadoTelefono.trim();
       }
 
       const resultado = await usuarioService.createCompleto(payload);
@@ -153,10 +156,10 @@ const CrearUsuario = () => {
 
       // Limpiar formulario
       setFormData({
-        username: '', password: '', idRol: '',
+        username: '', password: '', usuarioEmail: '', idRol: '',
         clienteNombre: '', clienteApellido: '', clienteCedula: '',
-        clienteEmail: '', clienteTelefono: '', clienteDireccion: '',
-        empleadoNombre: '', empleadoApellido: '', empleadoPuesto: '', empleadoIdBanco: '',
+        clienteTelefono: '', clienteDireccion: '',
+        empleadoNombre: '', empleadoApellido: '', empleadoTelefono: '', empleadoIdBanco: '',
       });
 
     } catch (err) {
@@ -204,8 +207,10 @@ const CrearUsuario = () => {
         <form onSubmit={handleSubmit}>
 
           {/* ── SECCIÓN 1: Credenciales ────────────────────── */}
-          <fieldset className="form-section">
-            <legend>🔐 Credenciales de Acceso</legend>
+          <div className="form-section">
+            <h4 style={{ color: 'var(--text-light)', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <span>🔐</span> Credenciales de Acceso
+            </h4>
             <div className="form-row">
               <div className="form-group">
                 <label htmlFor="username">Nombre de Usuario *</label>
@@ -224,27 +229,39 @@ const CrearUsuario = () => {
                 />
               </div>
             </div>
-            <div className="form-group">
-              <label htmlFor="idRol">Rol a Asignar *</label>
-              <select
-                id="idRol" name="idRol"
-                value={formData.idRol} onChange={handleChange}
-                disabled={isLoading}
-              >
-                <option value="">— Seleccionar Rol —</option>
-                {rolesDisponibles.map(rol => (
-                  <option key={rol.idRol} value={rol.idRol}>
-                    {rol.nombre} {rol.descripcion ? `— ${rol.descripcion}` : ''}
-                  </option>
-                ))}
-              </select>
+            <div className="form-row">
+              <div className="form-group">
+                <label htmlFor="idRol">Rol a Asignar *</label>
+                <select
+                  id="idRol" name="idRol"
+                  value={formData.idRol} onChange={handleChange}
+                  disabled={isLoading}
+                >
+                  <option value="">— Seleccionar Rol —</option>
+                  {rolesDisponibles.map(rol => (
+                    <option key={rol.idRol} value={rol.idRol}>
+                      {rol.nombre} {rol.descripcion ? `— ${rol.descripcion}` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-group">
+                <label htmlFor="usuarioEmail">Correo Electrónico (Opcional)</label>
+                <input
+                  type="email" id="usuarioEmail" name="usuarioEmail"
+                  value={formData.usuarioEmail} onChange={handleChange}
+                  placeholder="usuario@banco.com" disabled={isLoading}
+                />
+              </div>
             </div>
-          </fieldset>
+          </div>
 
           {/* ── SECCIÓN 2: Cliente (condicional) ────────────── */}
           {mostrarCamposCliente && (
-            <fieldset className="form-section section-cliente animate-in">
-              <legend>👤 Datos del Cliente</legend>
+            <div className="form-section section-cliente animate-in" style={{ borderLeft: '4px solid var(--secondary-color)', background: 'rgba(0, 180, 216, 0.05)' }}>
+              <h4 style={{ color: 'var(--secondary-color)', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span>👤</span> Datos Personales del Cliente
+              </h4>
               <div className="form-row">
                 <div className="form-group">
                   <label htmlFor="clienteNombre">Nombre *</label>
@@ -263,25 +280,17 @@ const CrearUsuario = () => {
                   />
                 </div>
               </div>
-              <div className="form-group">
-                <label htmlFor="clienteCedula">Cédula *</label>
-                <input
-                  type="text" id="clienteCedula" name="clienteCedula"
-                  value={formData.clienteCedula} onChange={handleChange}
-                  placeholder="Ej. 1-1234-5678" disabled={isLoading}
-                />
-              </div>
               <div className="form-row">
                 <div className="form-group">
-                  <label htmlFor="clienteEmail">Email</label>
+                  <label htmlFor="clienteCedula">Identidad (Cédula) *</label>
                   <input
-                    type="email" id="clienteEmail" name="clienteEmail"
-                    value={formData.clienteEmail} onChange={handleChange}
-                    placeholder="correo@ejemplo.com" disabled={isLoading}
+                    type="text" id="clienteCedula" name="clienteCedula"
+                    value={formData.clienteCedula} onChange={handleChange}
+                    placeholder="Ej. 1-1234-5678" disabled={isLoading}
                   />
                 </div>
                 <div className="form-group">
-                  <label htmlFor="clienteTelefono">Teléfono</label>
+                  <label htmlFor="clienteTelefono">Teléfono de Contacto</label>
                   <input
                     type="text" id="clienteTelefono" name="clienteTelefono"
                     value={formData.clienteTelefono} onChange={handleChange}
@@ -289,21 +298,23 @@ const CrearUsuario = () => {
                   />
                 </div>
               </div>
-              <div className="form-group">
-                <label htmlFor="clienteDireccion">Dirección</label>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label htmlFor="clienteDireccion">Dirección Física</label>
                 <input
                   type="text" id="clienteDireccion" name="clienteDireccion"
                   value={formData.clienteDireccion} onChange={handleChange}
                   placeholder="San José, Costa Rica" disabled={isLoading}
                 />
               </div>
-            </fieldset>
+            </div>
           )}
 
           {/* ── SECCIÓN 3: Empleado (condicional) ──────────── */}
           {mostrarCamposEmpleado && (
-            <fieldset className="form-section section-empleado animate-in">
-              <legend>🏢 Datos del Empleado</legend>
+            <div className="form-section section-empleado animate-in" style={{ borderLeft: '4px solid var(--accent-color)', background: 'rgba(255, 183, 3, 0.05)' }}>
+              <h4 style={{ color: 'var(--accent-color)', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span>🏢</span> Ficha del Empleado
+              </h4>
               <div className="form-row">
                 <div className="form-group">
                   <label htmlFor="empleadoNombre">Nombre *</label>
@@ -322,17 +333,17 @@ const CrearUsuario = () => {
                   />
                 </div>
               </div>
-              <div className="form-row">
+              <div className="form-row" style={{ marginBottom: 0 }}>
                 <div className="form-group">
-                  <label htmlFor="empleadoPuesto">Puesto</label>
+                  <label htmlFor="empleadoTelefono">Teléfono del Empleado</label>
                   <input
-                    type="text" id="empleadoPuesto" name="empleadoPuesto"
-                    value={formData.empleadoPuesto} onChange={handleChange}
-                    placeholder="Ej. Cajero, Gerente de Sucursal" disabled={isLoading}
+                    type="text" id="empleadoTelefono" name="empleadoTelefono"
+                    value={formData.empleadoTelefono} onChange={handleChange}
+                    placeholder="8888-8888" disabled={isLoading}
                   />
                 </div>
                 <div className="form-group">
-                  <label htmlFor="empleadoIdBanco">Banco *</label>
+                  <label htmlFor="empleadoIdBanco">Institución Bancaria *</label>
                   <select
                     id="empleadoIdBanco" name="empleadoIdBanco"
                     value={formData.empleadoIdBanco} onChange={handleChange}
@@ -347,7 +358,7 @@ const CrearUsuario = () => {
                   </select>
                 </div>
               </div>
-            </fieldset>
+            </div>
           )}
 
           {/* ── Indicador visual ────────────────────────────── */}
