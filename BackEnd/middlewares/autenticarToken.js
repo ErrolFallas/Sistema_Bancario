@@ -19,13 +19,11 @@ const { Usuario } = require('../models');
  * Retorna 403 si el token es inválido o la cuenta está suspendida.
  */
 const autenticarToken = async (req, res, next) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.startsWith('Bearer ')
-    ? authHeader.split(' ')[1]
-    : null;
+  // Extraer token desde las cookies
+  const token = req.cookies.token;
 
   if (!token) {
-    return res.status(401).json({ error: 'Acceso denegado. Se requiere un Token de autenticación en los headers (Authorization: Bearer <token>).' });
+    return res.status(401).json({ error: 'Acceso denegado. No se encontró una sesión activa (Cookie no presente).' });
   }
 
   try {

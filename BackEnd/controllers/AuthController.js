@@ -2,7 +2,8 @@
 // Controller: AuthController
 // Responsabilidad única: autenticación y JWT
 // ============================================
-// REGLAS DE CREACIÓN:
+
+con// REGLAS DE CREACIÓN:
 // - Primer usuario → SUPER_ADMIN sin relaciones
 // - Registro público → rol CLIENTE, requiere id_cliente previo
 // REGLAS DE SESIÓN:
@@ -68,11 +69,17 @@ const login = async (req, res) => {
       expiresIn: '30m',
     });
 
-    // 8. Respuesta — nunca incluir passwordHash
+    // 8. Enviar Token en Cookie segura
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'Lax', // O 'Strict' según necesidad
+      maxAge: 30 * 60 * 1000 // 30 minutos en ms
+    });
+
+    // 9. Respuesta — ya no incluimos el token en el JSON por seguridad
     return res.status(200).json({
       mensaje   : 'Login exitoso.',
-      token,
-      expiresIn : '30 minutos',
       usuario: {
         idUsuario    : usuario.idUsuario,
         username     : usuario.username,
@@ -101,6 +108,9 @@ const logout = async (req, res) => {
 
     // Marcar sesión como cerrada
     await usuario.update({ usuarioLogeado: false });
+
+    // Limpiar cookie del token
+    res.clearCookie('token');
 
     return res.status(200).json({
       mensaje: 'Sesión cerrada correctamente.',
