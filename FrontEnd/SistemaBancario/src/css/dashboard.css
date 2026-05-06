@@ -1,0 +1,180 @@
+/* ════════════════════════════════════════════
+   DASHBOARD — Cards, secciones, layouts base
+   ════════════════════════════════════════════ */
+
+/* ── Page Container ─────────────────────────── */
+.page-container {
+  padding: 2rem 5%;
+  max-width: 1200px;
+  margin: 0 auto;
+  animation: fadeIn 0.5s ease-out;
+}
+
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.page-header h1 {
+  font-size: 2rem;
+  font-weight: 700;
+  background: linear-gradient(90deg, #fff, var(--secondary-color));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* ── Hero Section (Home pública) ────────────── */
+.hero-section {
+  text-align: center;
+  padding: 5rem 0;
+  animation: fadeIn 0.8s ease-out;
+}
+
+.hero-section h1 {
+  font-size: 3.5rem;
+  font-weight: 800;
+  margin-bottom: 1.5rem;
+  background: linear-gradient(135deg, #fff, var(--secondary-color));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  letter-spacing: -1px;
+}
+
+.hero-section p {
+  font-size: 1.2rem;
+  color: var(--text-muted);
+  max-width: 600px;
+  margin: 0 auto;
+  line-height: 1.8;
+}
+
+/* ── Dashboard Cards ────────────────────────── */
+.dashboard-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1.5rem;
+}
+
+.card {
+  background: var(--surface-dark);
+  border: 1px solid var(--surface-border);
+  border-radius: 16px;
+  padding: 1.8rem;
+  transition: var(--transition-smooth);
+}
+
+.card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.card h3 {
+  font-size: 1.1rem;
+  color: var(--secondary-color);
+  margin-bottom: 0.8rem;
+}
+
+.card p {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.card.highlight {
+  background: linear-gradient(135deg, rgba(0, 180, 216, 0.1), rgba(13, 40, 71, 0.4));
+  border-color: rgba(0, 180, 216, 0.3);
+}
+
+/* ── Glass Card (para formularios) ──────────── */
+.glass-card {
+  background: var(--surface-dark);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--surface-border);
+  border-radius: 16px;
+  padding: 2.5rem;
+  box-shadow: var(--glass-shadow);
+  animation: floatUp 0.5s ease-out forwards;
+}
+
+/* ── Table ──────────────────────────────────── */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 1rem;
+}
+
+.data-table th,
+.data-table td {
+  padding: 0.9rem 1rem;
+  text-align: left;
+  border-bottom: 1px solid var(--surface-border);
+}
+
+.data-table th {
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.data-table th:first-child { border-radius: 8px 0 0 0; }
+.data-table th:last-child { border-radius: 0 8px 0 0; }
+
+.data-table tr { transition: var(--transition-smooth); }
+.data-table tbody tr:hover { background: rgba(0, 180, 216, 0.05); }
+
+.data-table td { font-size: 0.9rem; color: var(--text-light); }
+
+/* ── Badges ─────────────────────────────────── */
+.badge {
+  display: inline-block;
+  padding: 0.25rem 0.7rem;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.badge-admin { background: rgba(0, 180, 216, 0.15); color: var(--secondary-color); }
+.badge-cliente { background: rgba(6, 214, 160, 0.15); color: var(--success-color); }
+.badge-empleado { background: rgba(255, 183, 3, 0.15); color: var(--accent-color); }
+.badge-protegido { background: rgba(239, 35, 60, 0.12); color: #ff6b81; }
+
+/* ── Spinner ────────────────────────────────── */
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  min-height: 300px;
+  gap: 1rem;
+  color: var(--text-muted);
+}
+
+.spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid var(--surface-border);
+  border-top-color: var(--secondary-color);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Empty State ────────────────────────────── */
+.empty-state {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: var(--text-muted);
+}
+
+.empty-state p { font-size: 1rem; margin-bottom: 1rem; }

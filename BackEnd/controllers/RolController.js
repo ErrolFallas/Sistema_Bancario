@@ -3,7 +3,10 @@
 // CRUD para la entidad Rol
 // ============================================
 
-const { Rol, Permiso } = require("../models");
+const { Rol, Permiso, Usuario } = require("../models");
+
+// Roles protegidos del sistema — no se pueden eliminar ni renombrar
+const ROLES_PROTEGIDOS = ['SUPER_ADMIN', 'ADMIN', 'GERENTE', 'EMPLEADO', 'CLIENTE'];
 
 const crearRol = async (req, res) => {
   try {
@@ -45,6 +48,12 @@ const actualizarRol = async (req, res) => {
     if (!rol) {
       return res.status(404).json({ error: `Error de búsqueda: No se encontró el registro de Rol con el ID proporcionado en la base de datos.` });
     }
+
+    // Proteger roles base: no se puede cambiar el nombre de un rol protegido
+    if (ROLES_PROTEGIDOS.includes(rol.nombre.toUpperCase()) && req.body.nombre) {
+      return res.status(403).json({ error: `Operación denegada: El rol '${rol.nombre}' es un rol base del sistema y su nombre no puede ser modificado.` });
+    }
+
     await rol.update(req.body);
     return res.status(200).json(rol);
   } catch (error) {
@@ -58,6 +67,18 @@ const eliminarRol = async (req, res) => {
     if (!rol) {
       return res.status(404).json({ error: `Error de búsqueda: No se encontró el registro de Rol con el ID proporcionado en la base de datos.` });
     }
+
+    // No permitir eliminar roles base del sistema
+    if (ROLES_PROTEGIDOS.includes(rol.nombre.toUpperCase())) {
+      return res.status(403).json({ error: `Operación denegada: El rol '${rol.nombre}' es un rol base del sistema y no puede ser eliminado.` });
+    }
+
+    // Verificar si hay usuarios con este rol asignado
+    const usuariosConRol = await Usuario.count({ where: { idRol: rol.idRol } });
+    if (usuariosConRol > 0) {
+      return res.status(400).json({ error: `No se puede eliminar el rol '${rol.nombre}' porque tiene ${usuariosConRol} usuario(s) asignado(s). Reasigne los usuarios a otro rol primero.` });
+    }
+
     await rol.destroy();
     return res.status(200).json({ mensaje: "Rol eliminado correctamente" });
   } catch (error) {

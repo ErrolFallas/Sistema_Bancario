@@ -1,122 +1,68 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider } from './context/AuthContext';
+import ProtectedRoute from './routes/ProtectedRoute';
+
+// Componentes
+import Navbar from './components/Navbar';
+
+// Páginas
+import Home from './pages/Home';
+import Login from './pages/Login';
+import Unauthorized from './pages/Unauthorized';
+import GestionUsuarios from './pages/GestionUsuarios';
+import CrearUsuario from './pages/CrearUsuario';
+import GestionRoles from './pages/GestionRoles';
 
 function App() {
-  const [count, setCount] = useState(0)
-
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
+    <AuthProvider>
+      <BrowserRouter>
+        <Navbar />
+        <main>
+          <Routes>
+            {/* ── Rutas Públicas ────────────────────────────── */}
+            <Route path="/" element={<Home />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/unauthorized" element={<Unauthorized />} />
 
-      <div className="ticks"></div>
+            {/* ── Cualquier usuario logeado ──────────────────── */}
+            <Route element={<ProtectedRoute />}>
+              <Route path="/mi-cuenta" element={
+                <div style={{padding: '2rem 5%'}}>
+                  <h1>Mi Cuenta</h1>
+                  <p style={{color: 'var(--text-muted)', marginTop: '1rem'}}>
+                    Configuración de perfil próximamente.
+                  </p>
+                </div>
+              } />
+            </Route>
 
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
+            {/* ── Staff bancario (ADMIN, GERENTE, EMPLEADO) ──── */}
+            <Route element={<ProtectedRoute allowedRoles={['SUPER_ADMIN', 'ADMIN', 'GERENTE', 'EMPLEADO']} />}>
+              <Route path="/clientes" element={
+                <div style={{padding: '2rem 5%'}}>
+                  <h1>Gestión de Clientes</h1>
+                  <p style={{color: 'var(--text-muted)', marginTop: '1rem'}}>
+                    Módulo de gestión de clientes próximamente.
+                  </p>
+                </div>
+              } />
+              <Route path="/usuarios" element={<GestionUsuarios />} />
+              <Route path="/usuarios/crear" element={<CrearUsuario />} />
+            </Route>
 
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+            {/* ── Solo SUPER_ADMIN ──────────────────────────── */}
+            <Route element={<ProtectedRoute allowedRoles={['SUPER_ADMIN']} />}>
+              <Route path="/roles" element={<GestionRoles />} />
+            </Route>
+
+            {/* ── Fallback ──────────────────────────────────── */}
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </main>
+      </BrowserRouter>
+    </AuthProvider>
+  );
 }
 
-export default App
+export default App;

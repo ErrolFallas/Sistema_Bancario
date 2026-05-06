@@ -19,13 +19,19 @@ const {
 const { autenticarToken } = require('../middlewares/autenticarToken');
 const { verificarRol }    = require('../middlewares/verificarRol');
 
+// Controller transaccional: crea Usuario + Cliente/Empleado en una sola operación
+const { crearUsuarioCompleto } = require('../controllers/UsuarioCompletoController');
+
 // ── Rutas protegidas por JWT ────────────────────────────────────────────
 
 // Soft-delete: el propio usuario desactiva su cuenta (cualquier rol)
 // ⚠️ Debe ir ANTES de /:id para que Express no la interprete como un param
 router.patch('/eliminar-cuenta', autenticarToken, verificarRol('CLIENTE', 'EMPLEADO'), desactivarCuenta);
 
-// Solo ADMIN puede crear y listar todos los usuarios
+// Endpoint transaccional: crear usuario con cliente/empleado asociado
+// ⚠️ Debe ir ANTES de /:id para que Express no lo interprete como un param
+router.post('/completo', autenticarToken, verificarRol('ADMIN'), crearUsuarioCompleto);
+
 // Solo ADMIN puede crear y listar todos los usuarios
 router.post('/',    autenticarToken, verificarRol('ADMIN'), crearUsuario);
 router.get('/',     autenticarToken, verificarRol('ADMIN'), buscarUsuarios);

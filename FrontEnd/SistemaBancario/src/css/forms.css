@@ -1,0 +1,195 @@
+/* ════════════════════════════════════════════
+   FORMS — Estilos compartidos de formularios
+   Usado por: Login, CrearUsuario, GestionRoles
+   ════════════════════════════════════════════ */
+
+/* ── Animaciones globales ───────────────────── */
+@keyframes floatUp {
+  from { opacity: 0; transform: translateY(15px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.animate-in { animation: slideDown 0.35s ease-out forwards; }
+
+/* ── Alertas ────────────────────────────────── */
+.alert {
+  padding: 1rem;
+  border-radius: 8px;
+  margin-bottom: 1.5rem;
+  font-size: 0.9rem;
+}
+
+.alert-error {
+  background: rgba(239, 35, 60, 0.1);
+  border-left: 4px solid var(--error-color);
+  color: #ff4d6d;
+}
+
+.alert-success {
+  background: rgba(6, 214, 160, 0.1);
+  border-left: 4px solid var(--success-color);
+  color: #06d6a0;
+}
+
+/* ── Layout de formulario ───────────────────── */
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+@media (max-width: 600px) {
+  .form-row { grid-template-columns: 1fr; }
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-bottom: 1rem;
+}
+
+.form-group label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--surface-border);
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  color: var(--text-light);
+  font-size: 0.95rem;
+  font-family: var(--font-family);
+  transition: var(--transition-smooth);
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+  outline: none;
+  border-color: var(--secondary-color);
+  box-shadow: 0 0 0 3px rgba(0, 180, 216, 0.15);
+}
+
+.form-group input::placeholder {
+  color: rgba(255, 255, 255, 0.2);
+}
+
+.form-group select option {
+  background: #1a2d42;
+  color: var(--text-light);
+}
+
+/* ── Secciones de formulario (fieldset) ─────── */
+.form-section {
+  border: 1px solid var(--surface-border);
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  background: rgba(0, 0, 0, 0.15);
+}
+
+.form-section legend {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--text-light);
+  padding: 0 0.5rem;
+}
+
+.section-cliente { border-color: rgba(0, 180, 216, 0.3); }
+.section-cliente legend { color: var(--secondary-color); }
+
+.section-empleado { border-color: rgba(255, 183, 3, 0.3); }
+.section-empleado legend { color: var(--accent-color); }
+
+/* ── Botones ────────────────────────────────── */
+.btn-primary {
+  padding: 0.75rem 2rem;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  background: var(--secondary-color);
+  color: #000;
+  box-shadow: 0 4px 14px 0 rgba(0, 180, 216, 0.39);
+  transition: var(--transition-smooth);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: #0096b4;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 180, 216, 0.5);
+}
+
+.btn-primary:disabled {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-muted);
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.btn-secondary {
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  background: transparent;
+  color: var(--text-muted);
+  border: 1px solid var(--surface-border);
+  transition: var(--transition-smooth);
+}
+
+.btn-secondary:hover { background: rgba(255, 255, 255, 0.05); color: var(--text-light); }
+
+.btn-danger {
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  background: transparent;
+  color: var(--error-color);
+  border: 1px solid rgba(239, 35, 60, 0.3);
+  transition: var(--transition-smooth);
+}
+
+.btn-danger:hover { background: rgba(239, 35, 60, 0.15); }
+
+.form-actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-end;
+  margin-top: 0.5rem;
+}
+
+/* ── Preview de creación ────────────────────── */
+.form-preview {
+  text-align: center;
+  padding: 0.8rem;
+  background: rgba(0, 180, 216, 0.08);
+  border: 1px dashed rgba(0, 180, 216, 0.3);
+  border-radius: 8px;
+  margin-bottom: 1.5rem;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.form-preview strong {
+  color: var(--secondary-color);
+  margin-left: 0.3rem;
+}

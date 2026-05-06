@@ -3,7 +3,7 @@
 // Responsabilidad única: autenticación y JWT
 // ============================================
 
-con// REGLAS DE CREACIÓN:
+// REGLAS DE CREACIÓN:
 // - Primer usuario → SUPER_ADMIN sin relaciones
 // - Registro público → rol CLIENTE, requiere id_cliente previo
 // REGLAS DE SESIÓN:

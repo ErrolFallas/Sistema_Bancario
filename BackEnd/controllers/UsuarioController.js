@@ -28,9 +28,9 @@ const validarReglasRol = async (idRol, idCliente, idEmpleado) => {
 
   const nombreRol = rol.nombre.toUpperCase();
 
-  // REGLA: No se puede crear SUPER_ADMIN desde el controller de usuarios
+  // REGLA: Solo un SUPER_ADMIN puede crear otro SUPER_ADMIN
   if (nombreRol === 'SUPER_ADMIN') {
-    return { valido: false, status: 403, error: 'Operación denegada: No se puede crear o asignar el rol SUPER_ADMIN desde esta ruta. El primer SUPER_ADMIN se crea automáticamente vía /auth/register.' };
+    return { valido: false, status: 403, error: 'Operación denegada: No se puede crear o asignar el rol SUPER_ADMIN desde esta ruta. Solo un SUPER_ADMIN puede promover a otro usuario a SUPER_ADMIN.', requiereSuperAdmin: true };
   }
 
   // REGLA: Nunca ambos IDs simultáneamente
@@ -99,7 +99,14 @@ const crearUsuario = async (req, res) => {
     // --- VALIDACIÓN POR ROL ---
     const validacion = await validarReglasRol(resto.idRol, resto.idCliente, resto.idEmpleado);
     if (!validacion.valido) {
-      return res.status(validacion.status).json({ error: validacion.error });
+      // Si requiere SUPER_ADMIN y el usuario actual ES SUPER_ADMIN, permitir
+      if (validacion.requiereSuperAdmin && req.user && req.user.rol === 'SUPER_ADMIN') {
+        // Permitir: SUPER_ADMIN puede crear otro SUPER_ADMIN
+        validacion.valido = true;
+        validacion.nombreRol = 'SUPER_ADMIN';
+      } else {
+        return res.status(validacion.status).json({ error: validacion.error });
+      }
     }
 
     // --- LOGICA DE JERARQUÍA DE ROLES ---
