@@ -8,6 +8,7 @@ const express = require("express");
 const cors = require("cors");
 const cookieParser = require("cookie-parser");
 const db = require("./models");
+const { inicializarDatosBase } = require("./config/initSetup");
 
 const app = express();
 
@@ -102,6 +103,9 @@ const iniciarServidor = async () => {
         // Sincronizar tablas (no borra datos existentes)
         await db.sequelize.sync();
         console.log("✅  Tablas sincronizadas correctamente.");
+
+        // Poblar base de datos con Roles y Permisos base
+        await inicializarDatosBase();
 
         app.listen(PORT, () => {
             console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`);

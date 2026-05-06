@@ -5,12 +5,10 @@ import rolesPermisosService from '../services/rolesPermisosService';
 import '../css/dashboard.css';
 import '../css/forms.css';
 
-const ROLES_PROTEGIDOS = ['SUPER_ADMIN', 'ADMIN', 'GERENTE', 'EMPLEADO', 'CLIENTE'];
-
 /**
  * Gestión de Roles — Solo SUPER_ADMIN
- * Lista los roles existentes y permite crear nuevos roles dinámicos
- * asociados con múltiples permisos.
+ * Lista los roles existentes, permite crear nuevos roles (asociados a permisos),
+ * y eliminar roles con protección estricta para SUPER_ADMIN.
  */
 const GestionRoles = () => {
   const [roles, setRoles] = useState([]);
@@ -23,6 +21,11 @@ const GestionRoles = () => {
   const [nuevoRol, setNuevoRol] = useState({ nombre: '', descripcion: '' });
   const [permisosSeleccionados, setPermisosSeleccionados] = useState([]); // Array de IDs
   const [creando, setCreando] = useState(false);
+
+  // Estado del Modal de Eliminación
+  const [modalAbierto, setModalAbierto] = useState(false);
+  const [rolAEliminar, setRolAEliminar] = useState(null);
+  const [eliminando, setEliminando] = useState(false);
 
   // ── Cargar roles y permisos ──────────────────────────────
   const cargarDatos = async () => {
@@ -81,7 +84,6 @@ const GestionRoles = () => {
       });
 
       // 2. Asociar Permisos usando Promise.all
-      // Ejecutamos todos los POST a /roles-permisos en paralelo
       const promesasPermisos = permisosSeleccionados.map(idPermiso => 
         rolesPermisosService.create({
           idRol: rolCreado.idRol,
@@ -101,8 +103,6 @@ const GestionRoles = () => {
       cargarDatos(); 
       
     } catch (err) {
-      // Error handling avanzado: 
-      // Si el rol se creó pero fallaron los permisos, el sistema queda inconsistente.
       if (rolCreado) {
         setError(`El rol "${rolCreado.nombre}" se creó, pero hubo un error al asignarle los permisos. Detalle: ${err.message || 'Desconocido'}`);
       } else {
@@ -113,25 +113,44 @@ const GestionRoles = () => {
     }
   };
 
-  // ── Eliminar rol ─────────────────────────────────────────
-  const handleEliminar = async (rol) => {
-    if (ROLES_PROTEGIDOS.includes(rol.nombre.toUpperCase())) {
-      setError(`El rol "${rol.nombre}" es un rol base del sistema y no puede eliminarse.`);
+  // ── Confirmar Eliminación (Modal) ────────────────────────
+  const abrirModalEliminar = (rol) => {
+    if (rol.nombre.toUpperCase() === 'SUPER_ADMIN') {
+      setError("Por razones de seguridad, el rol SUPER_ADMIN no puede ser eliminado del sistema.");
       return;
     }
-
-    if (!window.confirm(`¿Está seguro de eliminar el rol "${rol.nombre}"? Esta acción no se puede deshacer.`)) {
-      return;
-    }
-
     setError('');
     setSuccess('');
+    setRolAEliminar(rol);
+    setModalAbierto(true);
+  };
+
+  const cerrarModal = () => {
+    setModalAbierto(false);
+    setRolAEliminar(null);
+  };
+
+  // ── Ejecutar Eliminación ─────────────────────────────────
+  const handleConfirmarEliminacion = async () => {
+    if (!rolAEliminar) return;
+
+    if (rolAEliminar.nombre.toUpperCase() === 'SUPER_ADMIN') {
+      cerrarModal();
+      setError("Operación rechazada: No se puede eliminar el rol SUPER_ADMIN.");
+      return;
+    }
+
+    setEliminando(true);
     try {
-      await rolService.delete(rol.idRol);
-      setSuccess(`Rol "${rol.nombre}" eliminado.`);
+      await rolService.delete(rolAEliminar.idRol);
+      setSuccess(`Rol "${rolAEliminar.nombre}" eliminado correctamente.`);
+      cerrarModal();
       cargarDatos();
     } catch (err) {
-      setError(err.message || 'Error al eliminar el rol. Puede que tenga usuarios asignados.');
+      setError(err.message || 'Error al eliminar el rol.');
+      cerrarModal();
+    } finally {
+      setEliminando(false);
     }
   };
 
@@ -260,13 +279,16 @@ const GestionRoles = () => {
                 <th>ID</th>
                 <th>Nombre</th>
                 <th>Descripción</th>
+                <th>Permisos Asignados</th>
                 <th>Tipo</th>
                 <th>Acciones</th>
               </tr>
             </thead>
             <tbody>
               {roles.map(rol => {
-                const esProtegido = ROLES_PROTEGIDOS.includes(rol.nombre.toUpperCase());
+                const nombreUpper = rol.nombre.toUpperCase();
+                const esSuperAdmin = nombreUpper === 'SUPER_ADMIN';
+
                 return (
                   <tr key={rol.idRol}>
                     <td>{rol.idRol}</td>
@@ -278,17 +300,24 @@ const GestionRoles = () => {
                     <td style={{ color: 'var(--text-muted)' }}>
                       {rol.descripcion || '—'}
                     </td>
-                    <td>
-                      {esProtegido
-                        ? <span className="badge badge-protegido">🔒 Base</span>
-                        : <span className="badge badge-admin">Dinámico</span>
+                    <td style={{ color: 'var(--text-light)', fontSize: '0.85rem', maxWidth: '300px', whiteSpace: 'normal' }}>
+                      {rol.permisos && rol.permisos.length > 0 
+                        ? rol.permisos.map(p => p.nombre).join(', ')
+                        : <span style={{color: 'var(--text-muted)'}}>Sin permisos específicos</span>
                       }
                     </td>
                     <td>
-                      {esProtegido ? (
-                        <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Protegido</span>
+                      {esSuperAdmin 
+                        ? <span className="badge badge-protegido">👑 Sistema</span>
+                        : <span className="badge badge-admin">Rol</span>
+                      }
+                    </td>
+                    <td>
+                      {/* LÓGICA DE VISIBILIDAD DE BOTÓN ELIMINAR */}
+                      {esSuperAdmin ? (
+                        <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Indispensable</span>
                       ) : (
-                        <button className="btn-danger" onClick={() => handleEliminar(rol)}>
+                        <button className="btn-danger" onClick={() => abrirModalEliminar(rol)}>
                           Eliminar
                         </button>
                       )}
@@ -298,6 +327,31 @@ const GestionRoles = () => {
               })}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* ── Modal de Confirmación ─────────────────────────── */}
+      {modalAbierto && rolAEliminar && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <div className="modal-header">
+              <h3>⚠️ Confirmar Eliminación</h3>
+            </div>
+            <div className="modal-body">
+              <p>¿Estás seguro de eliminar el rol <strong>{rolAEliminar.nombre}</strong>?</p>
+              <p style={{ marginTop: '0.5rem', color: '#ff4d6d' }}>
+                Esta acción es destructiva y no se puede deshacer.
+              </p>
+            </div>
+            <div className="modal-actions">
+              <button className="btn-secondary" onClick={cerrarModal} disabled={eliminando}>
+                Cancelar
+              </button>
+              <button className="btn-danger" onClick={handleConfirmarEliminacion} disabled={eliminando} style={{ background: '#ef233c', color: '#fff' }}>
+                {eliminando ? 'Eliminando...' : 'Confirmar Eliminación'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

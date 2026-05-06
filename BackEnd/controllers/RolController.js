@@ -3,7 +3,7 @@
 // CRUD para la entidad Rol
 // ============================================
 
-const { Rol, Permiso, Usuario } = require("../models");
+const { Rol, Permiso, Usuario, RolPermiso } = require("../models");
 
 // Roles protegidos del sistema — no se pueden eliminar ni renombrar
 const ROLES_PROTEGIDOS = ['SUPER_ADMIN', 'ADMIN', 'GERENTE', 'EMPLEADO', 'CLIENTE'];
@@ -78,6 +78,9 @@ const eliminarRol = async (req, res) => {
     if (usuariosConRol > 0) {
       return res.status(400).json({ error: `No se puede eliminar el rol '${rol.nombre}' porque tiene ${usuariosConRol} usuario(s) asignado(s). Reasigne los usuarios a otro rol primero.` });
     }
+
+    // Eliminar permisos asociados en la tabla pivote primero
+    await RolPermiso.destroy({ where: { idRol: rol.idRol } });
 
     await rol.destroy();
     return res.status(200).json({ mensaje: "Rol eliminado correctamente" });
