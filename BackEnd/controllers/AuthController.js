@@ -2,10 +2,14 @@
 // Controller: AuthController
 // Responsabilidad única: autenticación y JWT
 // ============================================
+// REGLAS DE CREACIÓN:
+// - Primer usuario → SUPER_ADMIN sin relaciones
+// - Registro público → rol CLIENTE, requiere id_cliente previo
+// ============================================
 
 const bcrypt   = require('bcrypt');
 const jwt      = require('jsonwebtoken');
-const { Usuario, Rol } = require('../models');
+const { Usuario, Rol, Cliente } = require('../models');
 
 // ============================================
 // POST /auth/login
@@ -97,11 +101,13 @@ const me = async (req, res) => {
 
 // ============================================
 // POST /auth/register
-// Registra un nuevo usuario públicamente
+// Registro de usuario con reglas estrictas:
+// - Primer usuario → SUPER_ADMIN (sin relaciones)
+// - Siguientes → CLIENTE (requiere id_cliente previo)
 // ============================================
 const register = async (req, res) => {
   try {
-    const { username, password, idCliente, idEmpleado } = req.body;
+    const { username, password, idCliente } = req.body;
 
     if (!username || !password) {
       return res.status(400).json({ error: 'Error de validación: Username y password son obligatorios para registrarse.' });
@@ -115,21 +121,48 @@ const register = async (req, res) => {
 
     const totalUsuarios = await Usuario.count();
     let rolAsignado;
+    let idClienteFinal = null;
 
-    // Si no hay usuarios en la base, el primero será SUPER_ADMIN
+    // ============================================
+    // CASO 1: Primer usuario → SUPER_ADMIN
+    // Sin relaciones (id_cliente e id_empleado = null)
+    // ============================================
     if (totalUsuarios === 0) {
       let rolAdmin = await Rol.findOne({ where: { nombre: 'SUPER_ADMIN' } });
       if (!rolAdmin) {
         rolAdmin = await Rol.create({ nombre: 'SUPER_ADMIN', descripcion: 'Administrador Supremo' });
       }
       rolAsignado = rolAdmin;
+      // Forzar sin relaciones para SUPER_ADMIN
+      idClienteFinal = null;
+
+    // ============================================
+    // CASO 2: Usuarios subsiguientes → CLIENTE
+    // Requiere id_cliente previo en la BD
+    // ============================================
     } else {
-      // Si ya hay usuarios, el rol por defecto es CLIENTE
       let rolCliente = await Rol.findOne({ where: { nombre: 'CLIENTE' } });
       if (!rolCliente) {
         rolCliente = await Rol.create({ nombre: 'CLIENTE', descripcion: 'Cliente estándar' });
       }
       rolAsignado = rolCliente;
+
+      // Validar que id_cliente venga en el body
+      if (!idCliente) {
+        return res.status(400).json({
+          error: 'Error de validación: Para registrarse como CLIENTE, debe proporcionar un id_cliente válido. El registro de cliente debe ser creado previamente por un ADMIN, GERENTE o EMPLEADO a través de POST /clientes.',
+        });
+      }
+
+      // Verificar que el cliente exista en la BD
+      const clienteExiste = await Cliente.findByPk(idCliente);
+      if (!clienteExiste) {
+        return res.status(404).json({
+          error: `Error de validación: No se encontró un registro de Cliente con el ID '${idCliente}'. Verifique que el cliente haya sido creado previamente.`,
+        });
+      }
+
+      idClienteFinal = idCliente;
     }
 
     // Hashear contraseña
@@ -141,8 +174,8 @@ const register = async (req, res) => {
       passwordHash,
       activo: true,
       idRol: rolAsignado.idRol,
-      idCliente: idCliente || null,
-      idEmpleado: idEmpleado || null
+      idCliente: idClienteFinal,
+      idEmpleado: null, // Registro público nunca asigna empleado
     });
 
     const { passwordHash: _, ...usuarioResponse } = nuevoUsuario.toJSON();

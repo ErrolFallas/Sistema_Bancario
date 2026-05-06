@@ -18,7 +18,7 @@ const {
   actualizarCliente,
 } = require("../controllers/ClienteController");
 
-router.post("/", autenticarToken, verificarRol('ADMIN', 'EMPLEADO'), crearCliente);
+router.post("/", autenticarToken, verificarRol('ADMIN', 'EMPLEADO', 'GERENTE'), crearCliente);
 router.get("/", autenticarToken, verificarRol('ADMIN', 'EMPLEADO', 'GERENTE', 'CLIENTE'), buscarClientes);
 router.get("/:id", autenticarToken, verificarRol('ADMIN', 'EMPLEADO', 'GERENTE', 'CLIENTE'), verificarPropiedad('Cliente'), buscarClienteId);
 router.delete("/:id", autenticarToken, verificarRol('ADMIN'), verificarPropiedad('Cliente'), eliminarCliente);

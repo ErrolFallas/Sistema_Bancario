@@ -65,6 +65,12 @@ module.exports = (sequelize) => {
         key: 'id_empleado',
       },
     },
+    fechaRegistro: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      defaultValue: DataTypes.NOW,
+      field: 'fecha_registro',
+    },
   }, {
     tableName: 'USUARIOS',
     timestamps: true,

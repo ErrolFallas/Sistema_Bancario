@@ -3,11 +3,82 @@
 // CRUD de usuarios + soft-delete
 // Login/JWT → AuthController (separado)
 // ============================================
+// REGLAS DE NEGOCIO:
+// - SUPER_ADMIN / ADMIN → sin id_cliente ni id_empleado
+// - CLIENTE → requiere id_cliente, prohíbe id_empleado
+// - EMPLEADO / GERENTE → requiere id_empleado, prohíbe id_cliente
+// - Nunca ambos IDs simultáneamente
+// ============================================
 
 const bcrypt = require('bcrypt');
 const { Usuario, Rol, Cliente, Empleado } = require('../models');
 
 const SALT_ROUNDS = 10;
+
+// ============================================
+// Función auxiliar: validar reglas por rol
+// ============================================
+const validarReglasRol = async (idRol, idCliente, idEmpleado) => {
+  // Obtener el nombre del rol
+  const rol = await Rol.findByPk(idRol);
+  if (!rol) {
+    return { valido: false, status: 400, error: `Error de validación: No existe un rol con el ID '${idRol}'.` };
+  }
+
+  const nombreRol = rol.nombre.toUpperCase();
+
+  // REGLA: No se puede crear SUPER_ADMIN desde el controller de usuarios
+  if (nombreRol === 'SUPER_ADMIN') {
+    return { valido: false, status: 403, error: 'Operación denegada: No se puede crear o asignar el rol SUPER_ADMIN desde esta ruta. El primer SUPER_ADMIN se crea automáticamente vía /auth/register.' };
+  }
+
+  // REGLA: Nunca ambos IDs simultáneamente
+  if (idCliente && idEmpleado) {
+    return { valido: false, status: 400, error: 'Error de validación: No se permite asignar id_cliente e id_empleado simultáneamente. Un usuario solo puede ser CLIENTE o EMPLEADO, no ambos.' };
+  }
+
+  // REGLA: CLIENTE → requiere id_cliente
+  if (nombreRol === 'CLIENTE') {
+    if (!idCliente) {
+      return { valido: false, status: 400, error: 'Error de validación: Para el rol CLIENTE, el campo id_cliente es obligatorio. Debe existir previamente un registro en CLIENTES.' };
+    }
+    if (idEmpleado) {
+      return { valido: false, status: 400, error: 'Error de validación: Un usuario con rol CLIENTE no puede tener id_empleado asignado.' };
+    }
+    // Verificar que el cliente exista
+    const cliente = await Cliente.findByPk(idCliente);
+    if (!cliente) {
+      return { valido: false, status: 404, error: `Error de validación: No se encontró un registro de Cliente con el ID '${idCliente}'. Debe crear el cliente primero.` };
+    }
+  }
+
+  // REGLA: EMPLEADO / GERENTE → requiere id_empleado
+  if (nombreRol === 'EMPLEADO' || nombreRol === 'GERENTE') {
+    if (!idEmpleado) {
+      return { valido: false, status: 400, error: `Error de validación: Para el rol ${nombreRol}, el campo id_empleado es obligatorio. Debe existir previamente un registro en EMPLEADOS.` };
+    }
+    if (idCliente) {
+      return { valido: false, status: 400, error: `Error de validación: Un usuario con rol ${nombreRol} no puede tener id_cliente asignado.` };
+    }
+    // Verificar que el empleado exista
+    const empleado = await Empleado.findByPk(idEmpleado);
+    if (!empleado) {
+      return { valido: false, status: 404, error: `Error de validación: No se encontró un registro de Empleado con el ID '${idEmpleado}'. Debe crear el empleado primero.` };
+    }
+  }
+
+  // REGLA: ADMIN → sin relaciones
+  if (nombreRol === 'ADMIN') {
+    if (idCliente) {
+      return { valido: false, status: 400, error: 'Error de validación: Un usuario con rol ADMIN no puede tener id_cliente asignado.' };
+    }
+    if (idEmpleado) {
+      return { valido: false, status: 400, error: 'Error de validación: Un usuario con rol ADMIN no puede tener id_empleado asignado.' };
+    }
+  }
+
+  return { valido: true, nombreRol };
+};
 
 // ============================================
 // POST /usuarios — Crear usuario (ADMIN)
@@ -20,9 +91,19 @@ const crearUsuario = async (req, res) => {
       return res.status(400).json({ error: 'Error de validación: La contraseña es un campo obligatorio para crear un usuario. Por favor proporcione un valor válido.' });
     }
 
+    if (!resto.idRol) {
+      return res.status(400).json({ error: 'Error de validación: El campo idRol es obligatorio para crear un usuario.' });
+    }
+
+    // --- VALIDACIÓN POR ROL ---
+    const validacion = await validarReglasRol(resto.idRol, resto.idCliente, resto.idEmpleado);
+    if (!validacion.valido) {
+      return res.status(validacion.status).json({ error: validacion.error });
+    }
+
     // --- LOGICA DE JERARQUÍA DE ROLES ---
-    if (req.body.idRol && req.user && req.user.rol === 'ADMIN') {
-      const rolSolicitado = await Rol.findByPk(req.body.idRol);
+    if (req.user && req.user.rol === 'ADMIN') {
+      const rolSolicitado = await Rol.findByPk(resto.idRol);
       if (rolSolicitado && rolSolicitado.nombre === 'SUPER_ADMIN') {
         return res.status(403).json({ error: 'Operación denegada: Un ADMIN no puede crear usuarios con privilegios de SUPER_ADMIN.' });
       }
@@ -89,6 +170,19 @@ const actualizarUsuario = async (req, res) => {
     const usuario = await Usuario.findByPk(req.params.id);
     if (!usuario) {
       return res.status(404).json({ error: `Error de actualización: No se puede actualizar. No se encontró el usuario con ID '${req.params.id}'.` });
+    }
+
+    // Si se cambia de rol, validar las reglas del nuevo rol
+    const nuevoIdRol = req.body.idRol || usuario.idRol;
+    const nuevoIdCliente = req.body.hasOwnProperty('idCliente') ? req.body.idCliente : usuario.idCliente;
+    const nuevoIdEmpleado = req.body.hasOwnProperty('idEmpleado') ? req.body.idEmpleado : usuario.idEmpleado;
+
+    // Validar reglas por rol (solo si se está cambiando rol o relaciones)
+    if (req.body.idRol || req.body.hasOwnProperty('idCliente') || req.body.hasOwnProperty('idEmpleado')) {
+      const validacion = await validarReglasRol(nuevoIdRol, nuevoIdCliente, nuevoIdEmpleado);
+      if (!validacion.valido) {
+        return res.status(validacion.status).json({ error: validacion.error });
+      }
     }
 
     // --- LOGICA DE JERARQUÍA DE ROLES ---

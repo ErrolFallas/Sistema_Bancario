@@ -50,12 +50,6 @@ module.exports = (sequelize) => {
       type: DataTypes.STRING(255),
       allowNull: true,
     },
-    fechaRegistro: {
-      type: DataTypes.DATE,
-      allowNull: true,
-      defaultValue: DataTypes.NOW,
-      field: 'fecha_registro',
-    },
   }, {
     tableName: 'CLIENTES',
     timestamps: true,
