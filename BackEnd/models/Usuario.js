@@ -33,10 +33,17 @@ module.exports = (sequelize) => {
         notEmpty: { msg: 'La contraseña es obligatoria' },
       },
     },
-    activo: {
+    cuentaActiva: {
       type: DataTypes.BOOLEAN,
       allowNull: false,
       defaultValue: true,
+      field: 'cuenta_activa',
+    },
+    usuarioLogeado: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false,
+      field: 'usuario_logeado',
     },
     idRol: {
       type: DataTypes.INTEGER,

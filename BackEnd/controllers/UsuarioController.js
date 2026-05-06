@@ -260,12 +260,12 @@ const desactivarCuenta = async (req, res) => {
       return res.status(404).json({ error: 'Error: No se encontró la información de su cuenta. Asegúrese de tener una sesión válida iniciada.' });
     }
 
-    if (!usuario.activo) {
+    if (!usuario.cuentaActiva) {
       return res.status(400).json({ error: 'Error de estado: Su cuenta ya se encuentra desactivada actualmente.' });
     }
 
-    // Soft delete: cambiar activo a false, NO borrar registro
-    await usuario.update({ activo: false });
+    // Soft delete: desactivar cuenta y cerrar sesión
+    await usuario.update({ cuentaActiva: false, usuarioLogeado: false });
 
     return res.status(200).json({
       mensaje: 'Cuenta desactivada exitosamente. Ya no podrá iniciar sesión.',

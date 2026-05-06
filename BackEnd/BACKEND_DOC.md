@@ -317,7 +317,11 @@ npx sequelize-cli db:migrate:undo:all
 
 ## 🔐 Seguridad (Implementada Avanzada)
 
-- **Autenticación (JWT):** `AuthController` maneja `/auth/login` (emite token de 30 min) y `/auth/register` (público, auto-asigna `SUPER_ADMIN` si la BD está vacía, o `CLIENTE` si ya hay usuarios — requiere `id_cliente` previo).
+- **Autenticación y Sesiones (JWT):** `AuthController` maneja el estado de sesión:
+  - `/auth/login`: Valida credenciales y `cuenta_activa = true`, emite token (30 min) y marca `usuario_logeado = true`.
+  - `/auth/logout`: Requiere JWT. Cierra la sesión marcando `usuario_logeado = false`.
+  - `/auth/register`: Público, auto-asigna `SUPER_ADMIN` si la BD está vacía, o `CLIENTE` si ya hay usuarios — requiere `id_cliente` previo.
+- **Validación de Estado de Sesión:** El middleware `autenticarToken` intercepta todas las peticiones privadas. No solo verifica la firma del JWT, sino que consulta la base de datos para validar que el usuario existe, que `cuenta_activa = true` y que `usuario_logeado = true`. Si alguna falla, la petición es denegada (incluso si el JWT aún no expira físicamente).
 - **Control de Pertenencia (Ownership):** Implementación de `verificarPropiedad.js`. Si un `CLIENTE` intenta acceder por `:id` a una Cuenta, Transacción o Tarjeta, este middleware intercepta la petición y va a la BD para validar que él es el verdadero dueño. Además, los controladores (`GET /`) inyectan un filtro (`where: { idCliente: req.user.idCliente }`) automáticamente en las consultas de los clientes.
 - **Roles y Jerarquía (RBAC):** Middleware dinámico `verificarRol` protege todas las rutas (24 archivos).
   - `SUPER_ADMIN` tiene acceso irrestricto absoluto a cualquier endpoint, sobreescribiendo arreglos de rutas.

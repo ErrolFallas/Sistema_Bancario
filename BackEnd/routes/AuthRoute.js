@@ -1,22 +1,23 @@
 // ============================================
 // Rutas: Auth
-// POST /auth/login  → login + JWT
 // POST /auth/login    → login + JWT
+// POST /auth/logout   → cerrar sesión
 // POST /auth/register → registro de usuario
-// GET  /auth/me       → perfil del token activo
+// GET  /auth/me       → perfil del usuario autenticado
 // ============================================
 
 const express = require('express');
 const router  = express.Router();
 
-const { login, me, register } = require('../controllers/AuthController');
-const { autenticarToken }     = require('../middlewares/autenticarToken');
+const { login, logout, me, register } = require('../controllers/AuthController');
+const { autenticarToken }             = require('../middlewares/autenticarToken');
 
 // Pública: login y registro
 router.post('/login', login);
 router.post('/register', register);
 
-// Privada: perfil del usuario autenticado
+// Privada: logout y perfil del usuario autenticado
+router.post('/logout', autenticarToken, logout);
 router.get('/me', autenticarToken, me);
 
 module.exports = router;

@@ -67,7 +67,7 @@ Los empleados son los operadores internos. A través de un usuario asociado, acc
 Representa las credenciales de acceso al sistema. Un usuario puede estar vinculado a un cliente (acceso banca en línea) o a un empleado (acceso administrativo), pero **nunca a ambos simultáneamente**. Incluye `fecha_registro` para rastrear cuándo se creó el acceso.
 
 **Función en el sistema:**
-Es la puerta de entrada al sistema. Controla la autenticación mediante un **hash de la contraseña (usando bcrypt)** y, a través de su rol y la generación de un **token JWT (expiración 30 min)**, determina qué acciones puede realizar cada persona. Soporta *soft delete* mediante el campo `activo`.
+Es la puerta de entrada al sistema. Controla la autenticación mediante un **hash de la contraseña (usando bcrypt)** y, a través de su rol y la generación de un **token JWT (expiración 30 min)**, determina qué acciones puede realizar cada persona. Soporta *soft delete* mediante el campo `cuenta_activa` y control de sesiones mediante el campo `usuario_logeado`. Para usar el sistema, ambas condiciones deben ser verdaderas.
 
 **Reglas de validación por rol (implementadas en `UsuarioController`):**
 
@@ -79,12 +79,13 @@ Es la puerta de entrada al sistema. Controla la autenticación mediante un **has
 | `EMPLEADO` | ❌ null | ✅ obligatorio | Debe existir previamente un registro en EMPLEADOS |
 | `GERENTE` | ❌ null | ✅ obligatorio | Debe existir previamente un registro en EMPLEADOS |
 
-**Flujos de creación:**
+**Flujos de creación y sesión:**
 - **Registro público** (`POST /auth/register`): Primer usuario → `SUPER_ADMIN` sin relaciones. Siguientes → `CLIENTE`, requiere `id_cliente` previo.
 - **Creación administrativa** (`POST /usuarios`): Requiere JWT. Valida reglas por rol antes de crear.
+- **Login / Logout**: El login valida credenciales y marca `usuario_logeado = true`. El logout (requiere token válido) marca `usuario_logeado = false`. El middleware de autenticación valida ambos en cada petición.
 
 **Campos principales:**
-`id_usuario` (PK), `username` (UNIQUE), `password_hash`, `activo`, `fecha_registro` (default CURRENT_TIMESTAMP), `id_rol` (FK → ROLES), `id_cliente` (FK nullable → CLIENTES), `id_empleado` (FK nullable → EMPLEADOS), `created_at`, `updated_at`.
+`id_usuario` (PK), `username` (UNIQUE), `password_hash`, `cuenta_activa` (BOOLEAN, default true), `usuario_logeado` (BOOLEAN, default false), `fecha_registro` (default CURRENT_TIMESTAMP), `id_rol` (FK → ROLES), `id_cliente` (FK nullable → CLIENTES), `id_empleado` (FK nullable → EMPLEADOS), `created_at`, `updated_at`.
 
 **Relaciones:**
 - `Usuario → Rol` — N:1 (cada usuario tiene un rol asignado).

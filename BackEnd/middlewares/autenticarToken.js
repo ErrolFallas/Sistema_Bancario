@@ -1,16 +1,24 @@
 // ============================================
 // Middleware: autenticarToken
-// Verifica el JWT en cada petición privada
+// Verifica el JWT y el estado de sesión
 // ============================================
 
 const jwt = require('jsonwebtoken');
+const { Usuario } = require('../models');
 
 /**
  * Extrae y verifica el Bearer token del header Authorization.
- * Si es válido, adjunta req.user con los datos del payload.
- * Retorna 401 si no hay token o 403 si expiró / es inválido.
+ * Si es válido:
+ *   1. Decodifica el JWT
+ *   2. Verifica en BD que el usuario existe
+ *   3. Verifica que cuenta_activa = true
+ *   4. Verifica que usuario_logeado = true
+ *   5. Adjunta req.user con los datos del payload
+ *
+ * Retorna 401 si no hay token, expiró o sesión inválida.
+ * Retorna 403 si el token es inválido o la cuenta está suspendida.
  */
-const autenticarToken = (req, res, next) => {
+const autenticarToken = async (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.startsWith('Bearer ')
     ? authHeader.split(' ')[1]
@@ -21,8 +29,28 @@ const autenticarToken = (req, res, next) => {
   }
 
   try {
+    // 1. Verificar y decodificar JWT
     const payload = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = payload; // { idUsuario, username, rol, activo }
+
+    // 2. Verificar estado real del usuario en BD
+    const usuario = await Usuario.findByPk(payload.idUsuario);
+
+    if (!usuario) {
+      return res.status(401).json({ error: 'Sesión inválida o expirada. El usuario asociado al token ya no existe en el sistema.' });
+    }
+
+    // 3. Verificar cuenta activa
+    if (!usuario.cuentaActiva) {
+      return res.status(403).json({ error: 'Acceso denegado: Su cuenta se encuentra inactiva o ha sido suspendida. Por favor, contacte al administrador del sistema.' });
+    }
+
+    // 4. Verificar sesión activa (usuario_logeado)
+    if (!usuario.usuarioLogeado) {
+      return res.status(401).json({ error: 'Sesión inválida o expirada. Debe iniciar sesión nuevamente con POST /auth/login.' });
+    }
+
+    // 5. Adjuntar payload al request
+    req.user = payload; // { idUsuario, username, rol, cuentaActiva, idCliente, idEmpleado }
     next();
   } catch (err) {
     if (err.name === 'TokenExpiredError') {

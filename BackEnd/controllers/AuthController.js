@@ -5,6 +5,9 @@
 // REGLAS DE CREACIÓN:
 // - Primer usuario → SUPER_ADMIN sin relaciones
 // - Registro público → rol CLIENTE, requiere id_cliente previo
+// REGLAS DE SESIÓN:
+// - Login → valida cuenta_activa, genera JWT, marca usuario_logeado = true
+// - Logout → marca usuario_logeado = false (requiere JWT válido)
 // ============================================
 
 const bcrypt   = require('bcrypt');
@@ -15,6 +18,7 @@ const { registrarAuditoria } = require('../utils/auditoria');
 // ============================================
 // POST /auth/login
 // Valida credenciales y emite un JWT (30 min)
+// Marca usuario_logeado = true
 // ============================================
 const login = async (req, res) => {
   try {
@@ -36,7 +40,7 @@ const login = async (req, res) => {
     }
 
     // 3. Verificar si la cuenta está activa
-    if (!usuario.activo) {
+    if (!usuario.cuentaActiva) {
       return res.status(403).json({ error: 'Acceso denegado: Su cuenta se encuentra inactiva o ha sido suspendida. Por favor, contacte al administrador del sistema.' });
     }
 
@@ -46,32 +50,60 @@ const login = async (req, res) => {
       return res.status(401).json({ error: 'Error de autenticación: La contraseña ingresada es incorrecta.' });
     }
 
-    // 5. Construir payload del JWT
+    // 5. Marcar usuario como logeado
+    await usuario.update({ usuarioLogeado: true });
+
+    // 6. Construir payload del JWT
     const payload = {
-      idUsuario : usuario.idUsuario,
-      username  : usuario.username,
-      rol       : usuario.rol ? usuario.rol.nombre.toUpperCase() : null, // Normalizar rol a MAYUSCULAS
-      activo    : usuario.activo,
-      idCliente : usuario.idCliente,
-      idEmpleado: usuario.idEmpleado
+      idUsuario    : usuario.idUsuario,
+      username     : usuario.username,
+      rol          : usuario.rol ? usuario.rol.nombre.toUpperCase() : null,
+      cuentaActiva : usuario.cuentaActiva,
+      idCliente    : usuario.idCliente,
+      idEmpleado   : usuario.idEmpleado
     };
 
-    // 6. Firmar token — 30 minutos de expiración
+    // 7. Firmar token — 30 minutos de expiración
     const token = jwt.sign(payload, process.env.JWT_SECRET, {
       expiresIn: '30m',
     });
 
-    // 7. Respuesta — nunca incluir passwordHash
+    // 8. Respuesta — nunca incluir passwordHash
     return res.status(200).json({
       mensaje   : 'Login exitoso.',
       token,
       expiresIn : '30 minutos',
       usuario: {
-        idUsuario : usuario.idUsuario,
-        username  : usuario.username,
-        rol       : payload.rol,
-        activo    : usuario.activo,
+        idUsuario    : usuario.idUsuario,
+        username     : usuario.username,
+        rol          : payload.rol,
+        cuentaActiva : usuario.cuentaActiva,
       },
+    });
+  } catch (error) {
+    return res.status(500).json({ error: 'Error interno del servidor al procesar la solicitud.', detalle: error.message });
+  }
+};
+
+// ============================================
+// POST /auth/logout
+// Cierra la sesión del usuario autenticado
+// Marca usuario_logeado = false
+// (requiere autenticarToken middleware)
+// ============================================
+const logout = async (req, res) => {
+  try {
+    const usuario = await Usuario.findByPk(req.user.idUsuario);
+
+    if (!usuario) {
+      return res.status(404).json({ error: 'Error: No se encontró la información de su usuario en la base de datos.' });
+    }
+
+    // Marcar sesión como cerrada
+    await usuario.update({ usuarioLogeado: false });
+
+    return res.status(200).json({
+      mensaje: 'Sesión cerrada correctamente.',
     });
   } catch (error) {
     return res.status(500).json({ error: 'Error interno del servidor al procesar la solicitud.', detalle: error.message });
@@ -134,7 +166,6 @@ const register = async (req, res) => {
         rolAdmin = await Rol.create({ nombre: 'SUPER_ADMIN', descripcion: 'Administrador Supremo' });
       }
       rolAsignado = rolAdmin;
-      // Forzar sin relaciones para SUPER_ADMIN
       idClienteFinal = null;
 
     // ============================================
@@ -148,14 +179,12 @@ const register = async (req, res) => {
       }
       rolAsignado = rolCliente;
 
-      // Validar que id_cliente venga en el body
       if (!idCliente) {
         return res.status(400).json({
           error: 'Error de validación: Para registrarse como CLIENTE, debe proporcionar un id_cliente válido. El registro de cliente debe ser creado previamente por un ADMIN, GERENTE o EMPLEADO a través de POST /clientes.',
         });
       }
 
-      // Verificar que el cliente exista en la BD
       const clienteExiste = await Cliente.findByPk(idCliente);
       if (!clienteExiste) {
         return res.status(404).json({
@@ -169,14 +198,14 @@ const register = async (req, res) => {
     // Hashear contraseña
     const passwordHash = await bcrypt.hash(password, 10);
 
-    // Crear usuario
+    // Crear usuario (cuenta_activa = true, usuario_logeado = false por defecto)
     const nuevoUsuario = await Usuario.create({
       username,
       passwordHash,
-      activo: true,
+      cuentaActiva: true,
       idRol: rolAsignado.idRol,
       idCliente: idClienteFinal,
-      idEmpleado: null, // Registro público nunca asigna empleado
+      idEmpleado: null,
     });
 
     // --- AUDITORÍA AUTOMÁTICA ---
@@ -184,13 +213,12 @@ const register = async (req, res) => {
     if (totalUsuarios === 0) {
       descripcionAuditoria = `Registro automático del primer SUPER_ADMIN: ${username}`;
     } else {
-      // Buscar nombre del cliente para la descripción
       const clienteInfo = await Cliente.findByPk(idClienteFinal);
       const nombreCliente = clienteInfo ? `${clienteInfo.nombre} ${clienteInfo.apellido}` : `id_cliente: ${idClienteFinal}`;
       descripcionAuditoria = `Auto-registro del usuario ${username} como CLIENTE (Cliente: ${nombreCliente})`;
     }
     await registrarAuditoria({
-      idUsuario: nuevoUsuario.idUsuario, // En register público, el creador es el propio usuario
+      idUsuario: nuevoUsuario.idUsuario,
       accion: 'CREATE',
       tablaAfectada: 'USUARIOS',
       idRegistro: nuevoUsuario.idUsuario,
@@ -211,4 +239,4 @@ const register = async (req, res) => {
   }
 };
 
-module.exports = { login, me, register };
+module.exports = { login, logout, me, register };
