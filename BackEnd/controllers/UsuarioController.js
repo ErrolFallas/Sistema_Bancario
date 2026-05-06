@@ -12,6 +12,7 @@
 
 const bcrypt = require('bcrypt');
 const { Usuario, Rol, Cliente, Empleado } = require('../models');
+const { registrarAuditoria, descripcionCrearUsuario } = require('../utils/auditoria');
 
 const SALT_ROUNDS = 10;
 
@@ -112,6 +113,18 @@ const crearUsuario = async (req, res) => {
 
     const hash = await bcrypt.hash(password, SALT_ROUNDS);
     const usuario = await Usuario.create({ ...resto, passwordHash: hash });
+
+    // --- AUDITORÍA AUTOMÁTICA ---
+    const descripcion = await descripcionCrearUsuario(req.user, usuario, validacion.nombreRol);
+    await registrarAuditoria({
+      idUsuario: req.user ? req.user.idUsuario : usuario.idUsuario,
+      accion: 'CREATE',
+      tablaAfectada: 'USUARIOS',
+      idRegistro: usuario.idUsuario,
+      descripcion,
+      ip: req.ip,
+    });
+    // -----------------------------
 
     // No exponer el hash en la respuesta
     const { passwordHash: _, ...usuarioPublico } = usuario.toJSON();

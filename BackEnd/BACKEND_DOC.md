@@ -4,7 +4,7 @@
 
 El **Backend del Sistema Bancario** es un proyecto construido con **Node.js** y **Sequelize ORM**, diseñado bajo el patrón de arquitectura **MVC (Modelo - Vista - Controlador)**. Su propósito es gestionar todas las operaciones bancarias: clientes, cuentas, tarjetas, transacciones, préstamos, empleados y auditoría, conectándose a una base de datos **MySQL**.
 
-Actualmente el proyecto **tiene implementada su arquitectura completa**: los 23 modelos Sequelize y sus migraciones están sincronizados, y todas las capas de controladores, rutas y middlewares (autenticación JWT, verificación de roles y manejos de errores descriptivos) ya están en funcionamiento.
+Actualmente el proyecto **tiene implementada su arquitectura completa**: los 23 modelos Sequelize y sus migraciones están sincronizados (24 archivos de migración), y todas las capas de controladores, rutas, middlewares y utilidades (autenticación JWT, verificación de roles, validación por rol, auditoría automática y manejos de errores descriptivos) ya están en funcionamiento.
 
 ---
 
@@ -43,13 +43,31 @@ BackEnd/
 │   ├── Prestamo.js                  # Préstamos otorgados
 │   ├── PagoPrestamo.js              # Pagos a préstamos
 │   └── HistorialAuditoria.js        # Log de auditoría
-├── migrations/                      # Migraciones Sequelize CLI (23 archivos)
+├── migrations/                      # Migraciones Sequelize CLI (24 archivos)
 │   ├── 001-create-roles.js
 │   ├── 002-create-permisos.js
 │   ├── 003-create-tipos-cuenta.js
-│   ├── ...                          # (004 a 022)
-│   └── 023-create-historial-auditoria.js
-├── database.js                      # Conexión directa a MySQL (legado)
+│   ├── ...                          # (004 a 023)
+│   └── 024-move-fecha-registro-to-usuarios.js
+├── controllers/                     # Lógica de negocio (24 controladores)
+│   ├── AuthController.js            # Login, registro y JWT
+│   ├── UsuarioController.js         # CRUD usuarios + validación por rol
+│   ├── ClienteController.js         # CRUD clientes + auditoría
+│   ├── EmpleadoController.js        # CRUD empleados + auditoría
+│   ├── CuentaController.js          # CRUD cuentas
+│   ├── HistorialAuditoriaController.js # Consulta de auditoría (solo lectura)
+│   └── ...                          # (18 controladores adicionales)
+├── routes/                          # Definición de endpoints de la API REST (24 archivos)
+│   ├── AuthRoute.js
+│   ├── UsuarioRoute.js
+│   └── ...
+├── middlewares/                     # Middlewares de seguridad y validación
+│   ├── autenticarToken.js           # Valida JWT
+│   ├── verificarRol.js              # Valida RBAC (Jerarquía de Roles)
+│   └── verificarPropiedad.js        # Valida pertenencia de recursos (Ownership)
+├── utils/                           # Utilidades reutilizables
+│   └── auditoria.js                 # Helper de auditoría automática
+├── app.js                           # Punto de entrada del servidor
 ├── .sequelizerc                     # Rutas para Sequelize CLI
 ├── .env                             # Variables de entorno (NO se sube a Git)
 ├── package.json                     # Dependencias y scripts
@@ -57,37 +75,17 @@ BackEnd/
 └── ENTIDADES_DOC.md                 # Documentación detallada de cada entidad
 ```
 
-### Estructura implementada (Controladores, Rutas y Middlewares)
-
-```
-BackEnd/
-├── controllers/         # Lógica de negocio (24 controladores)
-│   ├── AuthController.js    # Login y generación de JWT
-│   ├── UsuarioController.js
-│   ├── CuentaController.js
-│   └── ...
-├── routes/              # Definición de endpoints de la API REST
-│   ├── AuthRoute.js
-│   ├── UsuarioRoute.js
-│   └── ...
-├── middlewares/         # Middlewares de seguridad y validación
-│   ├── autenticarToken.js   # Valida JWT
-│   ├── verificarRol.js      # Valida RBAC (Jerarquía de Roles)
-│   └── verificarPropiedad.js# Valida pertenencia de recursos (Ownership)
-├── seed_usuarios.js     # Datos semilla (obsoleto tras creación dinámica)
-└── index.js             # Punto de entrada del servidor (por implementar)
-```
-
 ### ¿Qué hace cada capa?
 
 | Capa | Responsabilidad | Estado |
 |------|----------------|--------|
 | **Modelo** | Define la estructura de datos, validaciones y asociaciones con Sequelize ORM. | ✅ Implementado |
-| **Migraciones** | Scripts para crear/modificar tablas en MySQL de forma controlada y versionada. | ✅ Implementado |
+| **Migraciones** | Scripts para crear/modificar tablas en MySQL de forma controlada y versionada. | ✅ Implementado (24 archivos) |
 | **Configuración** | Centraliza la conexión a DB, JWT, CORS y Sequelize CLI. | ✅ Implementado |
 | **Controlador** | Contiene la lógica de negocio. Recibe peticiones, procesa datos y responde. | ✅ Implementado |
 | **Rutas** | Define los endpoints de la API y los conecta con los controladores. | ✅ Implementado |
 | **Middleware** | Funciones intermedias para autenticación (JWT), roles (RBAC) y validación de errores descriptiva. | ✅ Implementado |
+| **Utilidades** | Funciones auxiliares reutilizables (auditoría automática). | ✅ Implementado |
 
 ---
 
@@ -102,7 +100,7 @@ El sistema bancario gestiona **23 tablas** en MySQL, organizadas en 3 categoría
 | **CLIENTES** | Información personal de los clientes del banco. |
 | **BANCOS** | Información de los bancos registrados en el sistema. |
 | **EMPLEADOS** | Personal del banco con puesto y banco asignado. |
-| **USUARIOS** | Credenciales de acceso al sistema (vinculado a cliente o empleado). |
+| **USUARIOS** | Credenciales de acceso al sistema (vinculado a cliente o empleado, con fecha de registro). |
 | **CUENTAS** | Cuentas bancarias con saldo, estado y tipo. |
 | **TARJETAS** | Tarjetas asociadas a cuentas (débito/crédito). |
 | **TRANSACCIONES** | Registro de todas las operaciones financieras. |
@@ -126,12 +124,12 @@ El sistema bancario gestiona **23 tablas** en MySQL, organizadas en 3 categoría
 
 | Entidad | Descripción |
 |---------|-------------|
-| **ROLES** | Roles de usuario (admin, cajero, cliente). |
+| **ROLES** | Roles de usuario (SUPER_ADMIN, ADMIN, GERENTE, EMPLEADO, CLIENTE). |
 | **PERMISOS** | Acciones específicas permitidas en el sistema. |
 | **ROLES_PERMISOS** | Relación N:M entre roles y permisos. |
 | **CLIENTES_CUENTAS** | Relación N:M entre clientes y cuentas (cuentas compartidas). |
 | **PAGOS_PRESTAMO** | Registro de pagos realizados a préstamos. |
-| **HISTORIAL_AUDITORIA** | Log de todas las acciones realizadas en el sistema. |
+| **HISTORIAL_AUDITORIA** | Log automático de todas las acciones de creación en el sistema. |
 
 > 📖 La documentación detallada de cada entidad (descripción, relaciones y ejemplos) se encuentra en `ENTIDADES_DOC.md`.
 
@@ -148,14 +146,37 @@ Archivo central del sistema de modelos. Se encarga de:
 3. **Definir las 26 asociaciones** bidireccionales con `foreignKey` y `as` explícitos.
 4. **Exportar** todos los modelos y la instancia de sequelize.
 
-**Uso en controladores (futuro):**
+**Uso en controladores:**
 ```javascript
 const { Cliente, Cuenta, Transaccion } = require('../models');
 ```
 
-### `database.js`
+### `utils/auditoria.js`
 
-Archivo de conexión directa a MySQL. Existe como módulo independiente para compatibilidad con código previo. En el nuevo flujo, `models/index.js` gestiona su propia conexión.
+Helper reutilizable para el sistema de auditoría automática. Exporta:
+
+| Función | Propósito |
+|---------|-----------|
+| `registrarAuditoria(params)` | Inserta un registro en `HISTORIAL_AUDITORIA`. Nunca lanza errores (try/catch interno). |
+| `descripcionCrearUsuario(reqUser, usuario, nombreRol)` | Genera descripción dinámica para creación de usuarios según el rol. |
+| `descripcionCrearCliente(reqUser, cliente)` | Genera descripción dinámica para creación de clientes. |
+| `descripcionCrearEmpleado(reqUser, empleado)` | Genera descripción dinámica para creación de empleados (incluye puesto). |
+
+**Uso en controladores:**
+```javascript
+const { registrarAuditoria, descripcionCrearUsuario } = require('../utils/auditoria');
+
+// Después de crear la entidad exitosamente:
+const descripcion = await descripcionCrearUsuario(req.user, usuario, 'CLIENTE');
+await registrarAuditoria({
+  idUsuario: req.user.idUsuario,
+  accion: 'CREATE',
+  tablaAfectada: 'USUARIOS',
+  idRegistro: usuario.idUsuario,
+  descripcion,
+  ip: req.ip,
+});
+```
 
 ### `.sequelizerc`
 
@@ -201,11 +222,11 @@ DB_POOL_MIN=0
 DB_POOL_ACQUIRE=30000
 DB_POOL_IDLE=10000
 
-# JWT (para uso futuro)
+# JWT
 JWT_SECRET=sistema_bancario_secret_key_2026
 JWT_EXPIRES_IN=24h
 
-# CORS (para uso futuro)
+# CORS
 CORS_ORIGIN=http://localhost:5173
 ```
 
@@ -222,21 +243,15 @@ CORS_ORIGIN=http://localhost:5173
 | `sequelize` | Producción | ORM para interactuar con MySQL. |
 | `mysql2` | Producción | Driver de MySQL para Node.js. |
 | `dotenv` | Producción | Carga variables de entorno desde `.env`. |
+| `express` | Producción | Framework web para crear la API REST. |
+| `cors` | Producción | Habilita Cross-Origin Resource Sharing. |
+| `jsonwebtoken` | Producción | Generación y verificación de tokens JWT (30 min expiración). |
+| `bcrypt` | Producción | Hash de contraseñas de usuarios y números de tarjetas bancarias. |
 | `sequelize-cli` | Desarrollo | Herramienta CLI para migraciones y seeders. |
-
-### Dependencias Agregadas (Rutas, Controllers, Auth)
-
-| Paquete | Propósito |
-|---------|-----------|
-| `express` | Framework web para crear la API REST. |
-| `cors` | Habilita Cross-Origin Resource Sharing. |
-| `jsonwebtoken` | Generación y verificación de tokens JWT (30 min expiración). |
-| `bcrypt` | Hash de contraseñas de usuarios y números de tarjetas bancarias. |
 
 ### Instalación
 
 ```bash
-# Todas las dependencias (ORM, API y Seguridad)
 npm install sequelize mysql2 dotenv express cors jsonwebtoken bcrypt
 npm install --save-dev sequelize-cli
 ```
@@ -245,7 +260,7 @@ npm install --save-dev sequelize-cli
 
 ## 🗃️ Migraciones
 
-Las migraciones gestionan el esquema de la base de datos de forma versionada. Están numeradas del 001 al 023 en orden estricto de dependencias FK.
+Las migraciones gestionan el esquema de la base de datos de forma versionada. Están numeradas del 001 al 024 en orden estricto de dependencias FK.
 
 ### Comandos principales
 
@@ -279,6 +294,7 @@ npx sequelize-cli db:migrate:undo:all
 021:     PRESTAMOS → depende de CLIENTES + BANCOS + ESTADOS_PRESTAMO
 022:     PAGOS_PRESTAMO → depende de PRESTAMOS + TRANSACCIONES
 023:     HISTORIAL_AUDITORIA → depende de USUARIOS
+024:     Migración de datos: fecha_registro de CLIENTES → USUARIOS
 ```
 
 ---
@@ -286,7 +302,7 @@ npx sequelize-cli db:migrate:undo:all
 ## 🔗 Convenciones del Proyecto
 
 | Aspecto | Convención |
-|---------|-----------|
+|---------|------------|
 | **Tablas en DB** | `SNAKE_CASE` mayúsculas: `CLIENTES`, `TIPOS_CUENTA` |
 | **Campos en DB** | `snake_case` minúsculas: `id_cliente`, `fecha_registro` |
 | **Modelos en JS** | `PascalCase`: `Cliente`, `TipoCuenta` |
@@ -301,14 +317,83 @@ npx sequelize-cli db:migrate:undo:all
 
 ## 🔐 Seguridad (Implementada Avanzada)
 
-- **Autenticación (JWT):** `AuthController` maneja `/auth/login` (emite token de 30 min) y `/auth/register` (público, auto-asigna `SUPER_ADMIN` si la BD está vacía, o `CLIENTE` si ya hay usuarios).
+- **Autenticación (JWT):** `AuthController` maneja `/auth/login` (emite token de 30 min) y `/auth/register` (público, auto-asigna `SUPER_ADMIN` si la BD está vacía, o `CLIENTE` si ya hay usuarios — requiere `id_cliente` previo).
 - **Control de Pertenencia (Ownership):** Implementación de `verificarPropiedad.js`. Si un `CLIENTE` intenta acceder por `:id` a una Cuenta, Transacción o Tarjeta, este middleware intercepta la petición y va a la BD para validar que él es el verdadero dueño. Además, los controladores (`GET /`) inyectan un filtro (`where: { idCliente: req.user.idCliente }`) automáticamente en las consultas de los clientes.
 - **Roles y Jerarquía (RBAC):** Middleware dinámico `verificarRol` protege todas las rutas (24 archivos).
   - `SUPER_ADMIN` tiene acceso irrestricto absoluto a cualquier endpoint, sobreescribiendo arreglos de rutas.
   - `ADMIN` no puede crear nuevos `SUPER_ADMIN` ni editar el rol de un `SUPER_ADMIN` existente (Reglas implementadas en `UsuarioController`).
+- **Validación por Rol en Creación de Usuarios:** El `UsuarioController` implementa `validarReglasRol()` que garantiza:
+  - `CLIENTE` → requiere `id_cliente`, prohíbe `id_empleado`
+  - `EMPLEADO` / `GERENTE` → requiere `id_empleado`, prohíbe `id_cliente`
+  - `ADMIN` / `SUPER_ADMIN` → sin relaciones (`id_cliente` e `id_empleado` deben ser `null`)
+  - Nunca ambos IDs simultáneamente
 - **Bloqueos Físicos:** Se deshabilitaron los métodos `DELETE` en Transacciones, Movimientos y Historial, devolviendo un error 403 (normativa bancaria).
 - **Contraseñas y Datos Sensibles:** Uso estricto de `bcrypt` (SALT_ROUNDS = 10) para el campo `passwordHash` en `USUARIOS` y el número de tarjeta en `TARJETAS` mediante Hooks de Sequelize (`beforeCreate`, `beforeUpdate`).
 - **Manejo de Errores:** Todos los controladores devuelven mensajes de error detallados y descriptivos en español.
+
+---
+
+## 📋 Auditoría Automática
+
+El sistema registra automáticamente en `HISTORIAL_AUDITORIA` todas las acciones de creación de **USUARIOS**, **CLIENTES** y **EMPLEADOS**.
+
+### Arquitectura
+
+```
+Controller (crearUsuario/crearCliente/crearEmpleado)
+  ↓ .create() exitoso
+  ↓ Construir descripción dinámica
+  ↓ await registrarAuditoria(...)
+  ↓ Enviar respuesta al cliente
+```
+
+### Puntos de integración
+
+| Controller | Método | Tabla Auditada |
+|-----------|--------|----------------|
+| `UsuarioController` | `crearUsuario` | USUARIOS |
+| `AuthController` | `register` | USUARIOS |
+| `ClienteController` | `crearCliente` | CLIENTES |
+| `EmpleadoController` | `crearEmpleado` | EMPLEADOS |
+
+### Descripciones dinámicas
+
+Las descripciones incluyen **quién** creó **qué** y en **qué contexto**:
+
+| Escenario | Ejemplo de descripción |
+|-----------|----------------------|
+| Empleado crea usuario CLIENTE | `"El empleado María López (rol: EMPLEADO) creó el usuario jperez asociado al cliente Juan Pérez"` |
+| ADMIN crea usuario EMPLEADO | `"El ADMIN admin1 creó el usuario mlopez con rol EMPLEADO (Empleado: María López)"` |
+| SUPER_ADMIN crea ADMIN | `"El SUPER_ADMIN root creó el usuario admin2 con rol ADMIN"` |
+| Registro público primer usuario | `"Registro automático del primer SUPER_ADMIN: root"` |
+| Auto-registro CLIENTE | `"Auto-registro del usuario jperez como CLIENTE (Cliente: Juan Pérez)"` |
+| Empleado crea cliente | `"El empleado María López (rol: EMPLEADO) creó el cliente Juan Pérez"` |
+| ADMIN crea empleado | `"El SUPER_ADMIN root creó el empleado María López (puesto: Cajera)"` |
+
+### Reglas de resiliencia
+
+- La auditoría **NUNCA** rompe el flujo principal del controller.
+- Errores de auditoría se registran en `console.error` y retornan `null`.
+- La respuesta HTTP al cliente se envía independientemente del resultado de la auditoría.
+
+---
+
+## 🔄 Flujo de Creación de Entidades (Sin Dependencia Circular)
+
+### Para SUPER_ADMIN inicial
+1. `POST /auth/register` (BD vacía) → Usuario con rol SUPER_ADMIN, sin relaciones
+
+### Para CLIENTE
+1. `POST /clientes` (por ADMIN/EMPLEADO/GERENTE) → Crear registro de Cliente
+2. `POST /usuarios` con `idRol=CLIENTE` + `idCliente` → Crear usuario vinculado
+   - O alternativamente: `POST /auth/register` con `idCliente` → Auto-registro
+
+### Para EMPLEADO / GERENTE
+1. `POST /empleados` (por ADMIN/SUPER_ADMIN) → Crear registro de Empleado
+2. `POST /usuarios` con `idRol=EMPLEADO` + `idEmpleado` → Crear usuario vinculado
+
+### Para ADMIN
+1. `POST /usuarios` con `idRol=ADMIN` → Crear usuario sin relaciones
 
 ---
 
@@ -317,5 +402,7 @@ npx sequelize-cli db:migrate:undo:all
 - El backend utiliza **CommonJS** (`require/module.exports`) como sistema de módulos.
 - La base de datos debe ser creada previamente en MySQL con el nombre `SistemaBancario`.
 - Las migraciones crean las 23 tablas automáticamente con `npx sequelize-cli db:migrate`.
+- La migración 024 mueve `fecha_registro` de CLIENTES a USUARIOS.
 - La documentación detallada de cada entidad está en `ENTIDADES_DOC.md`.
 - La carpeta `FrontEnd/` se mantiene aislada y no es gestionada por este backend.
+- El servidor se inicia con `npm start` (ejecuta `node app.js`).

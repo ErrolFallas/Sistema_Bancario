@@ -5,10 +5,10 @@
 ## CLIENTES
 
 **Descripción:**
-Representa a las personas físicas que utilizan los servicios financieros del banco. Almacena su información personal y de contacto.
+Representa a las personas físicas que utilizan los servicios financieros del banco. Almacena su información personal y de contacto (nombre, apellido, cédula, email, teléfono, dirección).
 
 **Función en el sistema:**
-Es la entidad central del negocio. Todo servicio bancario (cuentas, tarjetas, préstamos, transacciones) está vinculado a un cliente. Sin clientes, el sistema no tiene razón de existir.
+Es la entidad central del negocio. Todo servicio bancario (cuentas, tarjetas, préstamos, transacciones) está vinculado a un cliente. Sin clientes, el sistema no tiene razón de existir. La creación de clientes solo puede ser realizada por roles autorizados: `SUPER_ADMIN`, `ADMIN`, `GERENTE` o `EMPLEADO`. Un usuario con rol `CLIENTE` **NO** puede crear otros clientes.
 
 **Relaciones:**
 - `Cliente ↔ Cuenta` — N:M a través de CLIENTES_CUENTAS (un cliente puede tener varias cuentas, una cuenta puede ser compartida).
@@ -16,8 +16,13 @@ Es la entidad central del negocio. Todo servicio bancario (cuentas, tarjetas, pr
 - `Cliente → Transacción` — 1:N (un cliente realiza múltiples transacciones).
 - `Cliente → Préstamo` — 1:N (un cliente puede tener varios préstamos).
 
+**Campos principales:**
+`id_cliente` (PK), `nombre`, `apellido`, `cedula` (UNIQUE), `email`, `telefono`, `direccion`, `created_at`, `updated_at`.
+
+> **Nota:** El campo `fecha_registro` fue movido a la tabla USUARIOS (migración 024), ya que la fecha de registro es un atributo del acceso al sistema, no del perfil del cliente.
+
 **Ejemplo:**
-> Juan Pérez (cédula: 1-1234-5678) se registra en el banco. Se le crea un registro en CLIENTES con su nombre, apellido, cédula, email y teléfono. A partir de ahí puede abrir cuentas, solicitar tarjetas y realizar transacciones.
+> Juan Pérez (cédula: 1-1234-5678) es registrado por un empleado del banco. Se le crea un registro en CLIENTES con su nombre, apellido, cédula, email y teléfono. Luego, se crea un USUARIO vinculado con `id_cliente` para que pueda acceder al sistema.
 
 ---
 
@@ -59,19 +64,36 @@ Los empleados son los operadores internos. A través de un usuario asociado, acc
 ## USUARIOS
 
 **Descripción:**
-Representa las credenciales de acceso al sistema. Un usuario puede estar vinculado a un cliente (acceso banca en línea) o a un empleado (acceso administrativo), pero no a ambos.
+Representa las credenciales de acceso al sistema. Un usuario puede estar vinculado a un cliente (acceso banca en línea) o a un empleado (acceso administrativo), pero **nunca a ambos simultáneamente**. Incluye `fecha_registro` para rastrear cuándo se creó el acceso.
 
 **Función en el sistema:**
-Es la puerta de entrada al sistema. Controla la autenticación mediante un **hash de la contraseña (usando bcrypt)** y, a través de su rol y la generación de un **token JWT (expiración 30 min)**, determina qué acciones puede realizar cada persona. Soporta *soft delete* mediante el campo `activo`. Al registrarse de forma pública (`POST /auth/register`), el primer usuario del sistema obtiene automáticamente el rol `SUPER_ADMIN`, y los subsiguientes obtienen `CLIENTE`.
+Es la puerta de entrada al sistema. Controla la autenticación mediante un **hash de la contraseña (usando bcrypt)** y, a través de su rol y la generación de un **token JWT (expiración 30 min)**, determina qué acciones puede realizar cada persona. Soporta *soft delete* mediante el campo `activo`.
+
+**Reglas de validación por rol (implementadas en `UsuarioController`):**
+
+| Rol | `id_cliente` | `id_empleado` | Descripción |
+|-----|-------------|---------------|-------------|
+| `SUPER_ADMIN` | ❌ null | ❌ null | Solo se crea vía `/auth/register` (primer usuario del sistema) |
+| `ADMIN` | ❌ null | ❌ null | Sin relaciones con cliente ni empleado |
+| `CLIENTE` | ✅ obligatorio | ❌ null | Debe existir previamente un registro en CLIENTES |
+| `EMPLEADO` | ❌ null | ✅ obligatorio | Debe existir previamente un registro en EMPLEADOS |
+| `GERENTE` | ❌ null | ✅ obligatorio | Debe existir previamente un registro en EMPLEADOS |
+
+**Flujos de creación:**
+- **Registro público** (`POST /auth/register`): Primer usuario → `SUPER_ADMIN` sin relaciones. Siguientes → `CLIENTE`, requiere `id_cliente` previo.
+- **Creación administrativa** (`POST /usuarios`): Requiere JWT. Valida reglas por rol antes de crear.
+
+**Campos principales:**
+`id_usuario` (PK), `username` (UNIQUE), `password_hash`, `activo`, `fecha_registro` (default CURRENT_TIMESTAMP), `id_rol` (FK → ROLES), `id_cliente` (FK nullable → CLIENTES), `id_empleado` (FK nullable → EMPLEADOS), `created_at`, `updated_at`.
 
 **Relaciones:**
 - `Usuario → Rol` — N:1 (cada usuario tiene un rol asignado).
 - `Usuario → Cliente` — N:1 nullable (si es un usuario de banca en línea).
 - `Usuario → Empleado` — N:1 nullable (si es un usuario administrativo).
-- `Usuario → HistorialAuditoria` — 1:N (las acciones del usuario quedan registradas).
+- `Usuario → HistorialAuditoria` — 1:N (las acciones del usuario quedan registradas automáticamente).
 
 **Ejemplo:**
-> Juan Pérez (cliente) tiene el usuario "jperez" con rol "cliente". María López (empleada) tiene el usuario "mlopez" con rol "cajero". Ambos acceden al mismo sistema pero ven interfaces y permisos distintos.
+> Juan Pérez (cliente) tiene el usuario "jperez" con rol "CLIENTE" y `id_cliente=1`. María López (empleada) tiene el usuario "mlopez" con rol "EMPLEADO" y `id_empleado=2`. El SUPER_ADMIN "root" no tiene ni `id_cliente` ni `id_empleado`. Ambos acceden al mismo sistema pero ven interfaces y permisos distintos.
 
 ---
 
@@ -374,16 +396,45 @@ Conecta el mundo de préstamos con el de transacciones. Cada pago de préstamo e
 ## HISTORIAL_AUDITORIA
 
 **Descripción:**
-Registro cronológico de todas las acciones significativas realizadas en el sistema. Almacena quién hizo qué, en qué tabla, a qué registro, desde qué IP y cuándo.
+Registro cronológico automático de todas las acciones de creación realizadas en el sistema. Almacena quién hizo qué, en qué tabla, a qué registro, desde qué IP, cuándo y con una **descripción legible** del contexto.
 
 **Función en el sistema:**
-Proporciona trazabilidad total para cumplimiento regulatorio, investigación de fraudes y rendición de cuentas. Si se elimina el usuario, el registro de auditoría se preserva (FK con SET NULL).
+Proporciona trazabilidad total para cumplimiento regulatorio, investigación de fraudes y rendición de cuentas. La auditoría se registra **automáticamente** desde los controllers (no depende de endpoints manuales ni de hooks de Sequelize). Si se elimina el usuario, el registro de auditoría se preserva (FK con SET NULL).
+
+**Sistema de auditoría automática:**
+El helper `utils/auditoria.js` se invoca dentro de cada controller después de cada `.create()` exitoso. Genera descripciones dinámicas que incluyen:
+- **Quién** creó (username, rol, nombre del empleado si aplica)
+- **Qué** se creó (nombre del cliente, empleado, o usuario)
+- **En qué contexto** (rol asignado, puesto del empleado)
+
+**Puntos de integración:**
+
+| Controller | Método | Tabla Auditada |
+|-----------|--------|----------------|
+| `UsuarioController` | `crearUsuario` | USUARIOS |
+| `AuthController` | `register` | USUARIOS |
+| `ClienteController` | `crearCliente` | CLIENTES |
+| `EmpleadoController` | `crearEmpleado` | EMPLEADOS |
+
+**Campos principales:**
+`id_auditoria` (PK), `accion`, `tabla_afectada`, `id_registro`, `descripcion` (TEXT), `fecha`, `ip`, `id_usuario` (FK nullable → USUARIOS), `created_at`, `updated_at`.
 
 **Relaciones:**
 - `HistorialAuditoria → Usuario` — N:1 nullable (quién realizó la acción; SET NULL si el usuario es eliminado).
 
-**Ejemplo:**
-> El usuario "mlopez" (cajera María López) aprueba la apertura de cuenta CTA-000999 desde la IP 192.168.1.50. Se registra: acción="CREATE", tabla_afectada="CUENTAS", id_registro=999, descripción="Apertura de cuenta de ahorro para cliente #42".
+**Ejemplos de registros generados automáticamente:**
+
+> **Creación de usuario CLIENTE:**
+> acción="CREATE", tabla="USUARIOS", descripción="El empleado María López (rol: EMPLEADO) creó el usuario jperez asociado al cliente Juan Pérez"
+
+> **Creación de empleado:**
+> acción="CREATE", tabla="EMPLEADOS", descripción="El SUPER_ADMIN root creó el empleado María López (puesto: Cajera)"
+
+> **Auto-registro del primer SUPER_ADMIN:**
+> acción="CREATE", tabla="USUARIOS", descripción="Registro automático del primer SUPER_ADMIN: root"
+
+> **Auto-registro de CLIENTE:**
+> acción="CREATE", tabla="USUARIOS", descripción="Auto-registro del usuario jperez como CLIENTE (Cliente: Juan Pérez)"
 
 ---
 

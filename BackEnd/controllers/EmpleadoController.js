@@ -4,10 +4,24 @@
 // ============================================
 
 const { Empleado, Banco } = require("../models");
+const { registrarAuditoria, descripcionCrearEmpleado } = require('../utils/auditoria');
 
 const crearEmpleado = async (req, res) => {
   try {
     const empleado = await Empleado.create(req.body);
+
+    // --- AUDITORÍA AUTOMÁTICA ---
+    const descripcion = await descripcionCrearEmpleado(req.user, empleado);
+    await registrarAuditoria({
+      idUsuario: req.user.idUsuario,
+      accion: 'CREATE',
+      tablaAfectada: 'EMPLEADOS',
+      idRegistro: empleado.idEmpleado,
+      descripcion,
+      ip: req.ip,
+    });
+    // -----------------------------
+
     return res.status(201).json(empleado);
   } catch (error) {
     return res.status(400).json({ error: 'Error de validación en los datos enviados.', detalle: error.message });

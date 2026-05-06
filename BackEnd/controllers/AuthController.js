@@ -10,6 +10,7 @@
 const bcrypt   = require('bcrypt');
 const jwt      = require('jsonwebtoken');
 const { Usuario, Rol, Cliente } = require('../models');
+const { registrarAuditoria } = require('../utils/auditoria');
 
 // ============================================
 // POST /auth/login
@@ -177,6 +178,26 @@ const register = async (req, res) => {
       idCliente: idClienteFinal,
       idEmpleado: null, // Registro público nunca asigna empleado
     });
+
+    // --- AUDITORÍA AUTOMÁTICA ---
+    let descripcionAuditoria;
+    if (totalUsuarios === 0) {
+      descripcionAuditoria = `Registro automático del primer SUPER_ADMIN: ${username}`;
+    } else {
+      // Buscar nombre del cliente para la descripción
+      const clienteInfo = await Cliente.findByPk(idClienteFinal);
+      const nombreCliente = clienteInfo ? `${clienteInfo.nombre} ${clienteInfo.apellido}` : `id_cliente: ${idClienteFinal}`;
+      descripcionAuditoria = `Auto-registro del usuario ${username} como CLIENTE (Cliente: ${nombreCliente})`;
+    }
+    await registrarAuditoria({
+      idUsuario: nuevoUsuario.idUsuario, // En register público, el creador es el propio usuario
+      accion: 'CREATE',
+      tablaAfectada: 'USUARIOS',
+      idRegistro: nuevoUsuario.idUsuario,
+      descripcion: descripcionAuditoria,
+      ip: req.ip,
+    });
+    // -----------------------------
 
     const { passwordHash: _, ...usuarioResponse } = nuevoUsuario.toJSON();
     

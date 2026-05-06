@@ -4,10 +4,24 @@
 // ============================================
 
 const { Cliente } = require("../models");
+const { registrarAuditoria, descripcionCrearCliente } = require('../utils/auditoria');
 
 const crearCliente = async (req, res) => {
   try {
     const cliente = await Cliente.create(req.body);
+
+    // --- AUDITORÍA AUTOMÁTICA ---
+    const descripcion = await descripcionCrearCliente(req.user, cliente);
+    await registrarAuditoria({
+      idUsuario: req.user.idUsuario,
+      accion: 'CREATE',
+      tablaAfectada: 'CLIENTES',
+      idRegistro: cliente.idCliente,
+      descripcion,
+      ip: req.ip,
+    });
+    // -----------------------------
+
     return res.status(201).json(cliente);
   } catch (error) {
     return res.status(400).json({ error: 'Error de validación en los datos enviados.', detalle: error.message });
