@@ -13,7 +13,7 @@
 const bcrypt = require('bcrypt');
 const { Usuario, Rol, Cliente, Empleado } = require('../models');
 const { registrarAuditoria, descripcionCrearUsuario } = require('../utils/auditoria');
-const { puedeModificar } = require('../utils/jerarquia');
+const { puedeModificar, puedeCrearRol, esMasAntiguo } = require('../utils/jerarquia');
 
 const SALT_ROUNDS = 10;
 
@@ -122,10 +122,38 @@ const crearUsuario = async (req, res) => {
       }
     }
 
-    // --- LOGICA DE JERARQUÍA DE ROLES ---
+    // --- LOGICA DE GOBERNANZA: LÍMITE SUPER_ADMIN (MAX 2) ---
     const rolSolicitado = await Rol.findByPk(resto.idRol);
-    if (rolSolicitado && !puedeModificar(req.user.rol, rolSolicitado.nombre)) {
-      return res.status(403).json({ error: `Operación denegada por jerarquía: Su rol (${req.user.rol}) no tiene permisos para crear usuarios con rol (${rolSolicitado.nombre}).` });
+    const nombreRolSolicitado = rolSolicitado?.nombre?.toUpperCase();
+
+    if (nombreRolSolicitado === 'SUPER_ADMIN') {
+      const totalSuperAdmins = await Usuario.count({
+        where: { cuentaActiva: true },
+        include: [{ model: Rol, as: 'rol', where: { nombre: 'SUPER_ADMIN' } }]
+      });
+
+      if (totalSuperAdmins >= 2) {
+        await registrarAuditoria({
+          idUsuario: req.user?.idUsuario,
+          accion: 'INTENTO_CREAR_SUPER_ADMIN',
+          tablaAfectada: 'USUARIOS',
+          descripcion: `Intento fallido de crear tercer SUPER_ADMIN. Límite alcanzado (2).`,
+          ip: req.ip,
+        });
+        return res.status(403).json({ error: 'Seguridad Bancaria: Se ha alcanzado el límite máximo de 2 SUPER_ADMIN activos.' });
+      }
+    }
+
+    // --- LOGICA DE JERARQUÍA DE CREACIÓN ---
+    if (req.user && !puedeCrearRol(req.user.rol, nombreRolSolicitado)) {
+      await registrarAuditoria({
+        idUsuario: req.user.idUsuario,
+        accion: 'INTENTO_ESCALAMIENTO_PRIVILEGIOS',
+        tablaAfectada: 'USUARIOS',
+        descripcion: `Intento de creación de rol superior: ${req.user.rol} intentó crear ${nombreRolSolicitado}`,
+        ip: req.ip,
+      });
+      return res.status(403).json({ error: `Jerarquía Bancaria: Su rol (${req.user.rol}) no tiene permisos para crear usuarios con nivel (${nombreRolSolicitado}).` });
     }
     // -------------------------------------
 
@@ -244,16 +272,102 @@ const actualizarUsuario = async (req, res) => {
 
     // --- LOGICA DE JERARQUÍA DE ROLES ---
     const rolActual = await Rol.findByPk(usuario.idRol);
-    const nombreRolAfectado = rolActual ? rolActual.nombre : 'CLIENTE';
+    const nombreRolAfectado = rolActual ? rolActual.nombre.toUpperCase() : 'CLIENTE';
+
+    // ── REGLA: Un SUPER_ADMIN NO puede desactivar su cuenta directamente ──
+    // (Esta validación se repite en los métodos de desactivación)
 
     if (req.user && !puedeModificar(req.user.rol, nombreRolAfectado)) {
-      return res.status(403).json({ error: `Operación denegada por jerarquía: Su rol (${req.user.rol}) no tiene permisos para modificar a un usuario con rol (${nombreRolAfectado}).` });
+      await registrarAuditoria({
+        idUsuario: req.user.idUsuario,
+        accion: 'INTENTO_ESCALAMIENTO_PRIVILEGIOS',
+        tablaAfectada: 'USUARIOS',
+        descripcion: `Intento de modificación prohibida: ${req.user.rol} intentó modificar a ${nombreRolAfectado} (${usuario.username})`,
+        ip: req.ip,
+      });
+      return res.status(403).json({ error: `Jerarquía Bancaria: Su rol (${req.user.rol}) no tiene permisos para modificar a un usuario con nivel (${nombreRolAfectado}).` });
+    }
+
+    // --- PROTECCIÓN DE SENIORITY (SUPER_ADMIN) ---
+    // Regla: Solo aplica sobre OTROS Super Admins, no sobre sí mismo.
+    if (req.user.rol === 'SUPER_ADMIN' && nombreRolAfectado === 'SUPER_ADMIN' && req.user.idUsuario !== usuario.idUsuario) {
+      const actor = await Usuario.findByPk(req.user.idUsuario);
+      if (!esMasAntiguo(actor, usuario)) {
+        await registrarAuditoria({
+          idUsuario: req.user.idUsuario,
+          accion: 'INTENTO_MODIFICAR_SUPER_ADMIN_SENIOR',
+          tablaAfectada: 'USUARIOS',
+          descripcion: `SUPER_ADMIN reciente (${actor.username}) intentó modificar a uno más antiguo (${usuario.username})`,
+          ip: req.ip,
+        });
+        return res.status(403).json({ error: 'Seguridad Bancaria: Un SUPER_ADMIN más reciente no puede modificar a uno más antiguo.' });
+      }
+    }
+
+    // --- REGLA: AUTO-REBAJA DE ROL (SUPER_ADMIN -> OTRO) ---
+    if (req.user.idUsuario === usuario.idUsuario && nombreRolAfectado === 'SUPER_ADMIN' && req.body.idRol) {
+      const nuevoRolObj = await Rol.findByPk(req.body.idRol);
+      const nuevoNombreRol = nuevoRolObj?.nombre?.toUpperCase();
+
+      if (nuevoNombreRol !== 'SUPER_ADMIN') {
+        const totalSuperAdminsActivos = await Usuario.count({
+          where: { cuentaActiva: true },
+          include: [{ model: Rol, as: 'rol', where: { nombre: 'SUPER_ADMIN' } }]
+        });
+
+        if (totalSuperAdminsActivos <= 1) {
+          await registrarAuditoria({
+            idUsuario: req.user.idUsuario,
+            accion: 'INTENTO_ABANDONAR_ULTIMO_SUPER_ADMIN',
+            tablaAfectada: 'USUARIOS',
+            descripcion: `Intento fallido de abandonar el rol SUPER_ADMIN siendo el último activo.`,
+            ip: req.ip,
+          });
+          return res.status(403).json({ error: 'Gobernanza Crítica: No puedes abandonar el rol SUPER_ADMIN porque eres el último SUPER_ADMIN activo del sistema.' });
+        }
+        
+        await registrarAuditoria({
+          idUsuario: req.user.idUsuario,
+          accion: 'CAMBIO_ROL_SUPER_ADMIN_A_ADMIN',
+          tablaAfectada: 'USUARIOS',
+          descripcion: `El usuario ${usuario.username} se ha rebajado voluntariamente de SUPER_ADMIN a ${nuevoNombreRol}.`,
+          ip: req.ip,
+        });
+      }
     }
 
     if (req.body.idRol) {
       const rolSolicitado = await Rol.findByPk(req.body.idRol);
-      if (rolSolicitado && req.user && !puedeModificar(req.user.rol, rolSolicitado.nombre)) {
-        return res.status(403).json({ error: `Operación denegada por jerarquía: Su rol (${req.user.rol}) no tiene permisos para promover a un usuario al rol (${rolSolicitado.nombre}).` });
+      const nombreRolSolicitado = rolSolicitado?.nombre?.toUpperCase();
+
+      if (rolSolicitado && req.user && !puedeCrearRol(req.user.rol, nombreRolSolicitado)) {
+        await registrarAuditoria({
+          idUsuario: req.user.idUsuario,
+          accion: 'INTENTO_ESCALAMIENTO_PRIVILEGIOS',
+          tablaAfectada: 'USUARIOS',
+          descripcion: `Intento de promoción prohibida: ${req.user.rol} intentó promover a ${nombreRolSolicitado}`,
+          ip: req.ip,
+        });
+        return res.status(403).json({ error: `Jerarquía Bancaria: Su rol (${req.user.rol}) no tiene permisos para promover a un usuario al nivel (${nombreRolSolicitado}).` });
+      }
+
+      // --- REGLA DE GOBERNANZA: LÍMITE SUPER_ADMIN (MAX 2) EN PROMOCIÓN ---
+      if (nombreRolSolicitado === 'SUPER_ADMIN' && usuario.idRol !== req.body.idRol) {
+        const totalSuperAdmins = await Usuario.count({
+          where: { cuentaActiva: true },
+          include: [{ model: Rol, as: 'rol', where: { nombre: 'SUPER_ADMIN' } }]
+        });
+
+        if (totalSuperAdmins >= 2) {
+           await registrarAuditoria({
+            idUsuario: req.user.idUsuario,
+            accion: 'INTENTO_PROMOCION_SUPER_ADMIN_FALLIDO',
+            tablaAfectada: 'USUARIOS',
+            descripcion: `Intento de promoción a SUPER_ADMIN fallido por límite (2). Usuario objetivo: ${usuario.username}`,
+            ip: req.ip,
+          });
+          return res.status(403).json({ error: 'Seguridad Bancaria: No se puede promover a este usuario. Se ha alcanzado el límite máximo de 2 SUPER_ADMIN activos.' });
+        }
       }
     }
     // -------------------------------------
@@ -320,6 +434,19 @@ const desactivarCuenta = async (req, res) => {
       return res.status(400).json({ error: 'Error de estado: Su cuenta ya se encuentra desactivada actualmente.' });
     }
 
+    // --- REGLA: NO AUTO-DESACTIVACIÓN DE SUPER_ADMIN ---
+    const rolActual = await Rol.findByPk(usuario.idRol);
+    if (rolActual?.nombre === 'SUPER_ADMIN') {
+      await registrarAuditoria({
+        idUsuario: req.user.idUsuario,
+        accion: 'INTENTO_DESACTIVACION_DIRECTA_SUPER_ADMIN',
+        tablaAfectada: 'USUARIOS',
+        descripcion: `Intento de desactivación directa de cuenta siendo SUPER_ADMIN.`,
+        ip: req.ip,
+      });
+      return res.status(403).json({ error: 'Gobernanza Bancaria: Un SUPER_ADMIN no puede desactivar su propia cuenta directamente. Primero debe rebajar su rol a ADMIN.' });
+    }
+
     // Soft delete: desactivar cuenta y cerrar sesión
     await usuario.update({ cuentaActiva: false, usuarioLogeado: false });
 
@@ -342,7 +469,41 @@ const desactivarUsuario = async (req, res) => {
     const nombreRolAfectado = rolActual ? rolActual.nombre : 'CLIENTE';
 
     if (req.user && !puedeModificar(req.user.rol, nombreRolAfectado)) {
-      return res.status(403).json({ error: `Operación denegada por jerarquía: Su rol (${req.user.rol}) no tiene permisos para desactivar a un usuario con rol (${nombreRolAfectado}).` });
+      await registrarAuditoria({
+        idUsuario: req.user.idUsuario,
+        accion: 'INTENTO_DESACTIVAR_SUPERIOR',
+        tablaAfectada: 'USUARIOS',
+        descripcion: `Intento de desactivación prohibida: ${req.user.rol} intentó desactivar a ${nombreRolAfectado}`,
+        ip: req.ip,
+      });
+      return res.status(403).json({ error: `Jerarquía Bancaria: Su rol (${req.user.rol}) no tiene permisos para desactivar a un usuario con nivel (${nombreRolAfectado}).` });
+    }
+
+    // --- PROTECCIÓN DE SENIORITY (SUPER_ADMIN) ---
+    if (req.user.rol === 'SUPER_ADMIN' && nombreRolAfectado === 'SUPER_ADMIN' && req.user.idUsuario !== usuario.idUsuario) {
+      const actor = await Usuario.findByPk(req.user.idUsuario);
+      if (!esMasAntiguo(actor, usuario)) {
+        await registrarAuditoria({
+          idUsuario: req.user.idUsuario,
+          accion: 'INTENTO_DESACTIVAR_SUPER_ADMIN_SENIOR',
+          tablaAfectada: 'USUARIOS',
+          descripcion: `SUPER_ADMIN reciente (${actor.username}) intentó desactivar a uno más antiguo (${usuario.username})`,
+          ip: req.ip,
+        });
+        return res.status(403).json({ error: 'Seguridad Bancaria: Un SUPER_ADMIN más reciente no puede desactivar a uno más antiguo.' });
+      }
+    }
+
+    // --- PROTECCIÓN AUTO-DESACTIVACIÓN SUPER_ADMIN ---
+    if (nombreRolAfectado === 'SUPER_ADMIN' && usuario.idUsuario === req.user.idUsuario) {
+      await registrarAuditoria({
+        idUsuario: req.user.idUsuario,
+        accion: 'INTENTO_DESACTIVACION_DIRECTA_SUPER_ADMIN',
+        tablaAfectada: 'USUARIOS',
+        descripcion: `Intento de desactivación directa (vía gestión) siendo SUPER_ADMIN.`,
+        ip: req.ip,
+      });
+      return res.status(403).json({ error: 'Gobernanza Bancaria: Un SUPER_ADMIN no puede desactivar su propia cuenta directamente. Primero debe rebajar su rol a ADMIN.' });
     }
 
     if (usuario.cuentaActiva === false) {
@@ -379,7 +540,11 @@ const reactivarUsuario = async (req, res) => {
     const nombreRolAfectado = rolActual ? rolActual.nombre : 'CLIENTE';
 
     if (req.user && !puedeModificar(req.user.rol, nombreRolAfectado)) {
-      return res.status(403).json({ error: `Operación denegada por jerarquía: Su rol (${req.user.rol}) no tiene permisos para reactivar a un usuario con rol (${nombreRolAfectado}).` });
+      const errorMsg = nombreRolAfectado === 'SUPER_ADMIN' 
+        ? 'Jerarquía Bancaria: SOLO un SUPER_ADMIN puede reactivar cuentas de SUPER_ADMIN.'
+        : `Operación denegada por jerarquía: Su rol (${req.user.rol}) no tiene permisos para reactivar a un usuario con rol (${nombreRolAfectado}).`;
+      
+      return res.status(403).json({ error: errorMsg });
     }
 
     if (usuario.cuentaActiva === true) {

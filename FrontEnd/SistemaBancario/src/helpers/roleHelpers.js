@@ -27,10 +27,6 @@ export const PROTECTED_ROLES = ['SUPER_ADMIN', 'ADMIN', 'GERENTE', 'EMPLEADO', '
 
 /**
  * Verifica si el rol del usuario tiene acceso a una lista de roles requeridos.
- * SUPER_ADMIN siempre tiene acceso.
- * @param {string} userRole - Rol del usuario autenticado
- * @param {string[]} requiredRoles - Roles permitidos para la acción
- * @returns {boolean}
  */
 export const canAccess = (userRole, requiredRoles) => {
   if (!userRole) return false;
@@ -40,24 +36,73 @@ export const canAccess = (userRole, requiredRoles) => {
 };
 
 /**
- * Verifica si un rol puede modificar/actuar sobre otro rol (jerarquía).
- * Un rol solo puede modificar roles de nivel inferior.
- * @param {string} actorRole - Rol del usuario que ejecuta la acción
- * @param {string} targetRole - Rol del usuario objetivo
- * @returns {boolean}
+ * REGLA DE CREACIÓN: Jerarquía Bancaria
+ * Define qué roles puede crear el usuario según su propio rol.
  */
-export const canModify = (actorRole, targetRole) => {
+export const canCreate = (actorRole, targetRole) => {
   if (!actorRole || !targetRole) return false;
-  const actorLevel = ROLE_HIERARCHY[actorRole.toUpperCase()] || 0;
-  const targetLevel = ROLE_HIERARCHY[targetRole.toUpperCase()] || 0;
+  const actor = actorRole.toUpperCase();
+  const target = targetRole.toUpperCase();
+
+  if (actor === 'SUPER_ADMIN') return true;
+  
+  // Matriz de gobernanza oficial:
+  // ADMIN no puede crear ADMIN ni SUPER_ADMIN
+  if (actor === 'ADMIN') return ['GERENTE', 'EMPLEADO', 'CLIENTE'].includes(target);
+  
+  if (actor === 'GERENTE') return ['EMPLEADO', 'CLIENTE'].includes(target);
+  if (actor === 'EMPLEADO') return target === 'CLIENTE';
+  return false;
+};
+
+/**
+ * REGLA DE MODIFICACIÓN: Jerarquía Estricta
+ * Determina si el actor puede realizar operaciones sobre el objetivo.
+ */
+export const canModify = (actorRole, targetRole, isSelf = false) => {
+  if (!actorRole || !targetRole) return false;
+  const actor = actorRole.toUpperCase();
+  const target = targetRole.toUpperCase();
+
+  // Regla de Auto-modificación:
+  // Siempre permitida excepto devaluaciones críticas validadas en backend.
+  if (isSelf) return true;
+
+  const actorLevel = ROLE_HIERARCHY[actor] || 0;
+  const targetLevel = ROLE_HIERARCHY[target] || 0;
+
+  // SUPER_ADMIN puede actuar sobre otros SUPER_ADMIN (sujeto a seniority en backend)
+  if (actor === 'SUPER_ADMIN' && target === 'SUPER_ADMIN') return true;
+
+  // El actor debe ser de nivel superior al objetivo
   return actorLevel > targetLevel;
 };
 
 /**
+ * REGLA DE SENIORITY: Protección SUPER_ADMIN
+ * Determina si el actor tiene antigüedad suficiente para actuar sobre el objetivo.
+ * Regla: Solo aplica sobre OTROS Super Admins.
+ */
+export const hasSeniority = (actor, target) => {
+  if (!actor || !target) return true;
+  
+  // Si no son ambos SUPER_ADMIN, no aplica seniority
+  if (actor.rol !== 'SUPER_ADMIN' || target.rol !== 'SUPER_ADMIN') return true;
+  
+  // Auto-gestión: Un Super Admin siempre tiene "seniority" sobre sí mismo
+  if (actor.idUsuario === target.idUsuario) return true;
+  
+  if (!actor.created_at || !target.created_at) return true;
+  
+  const actorDate = new Date(actor.created_at);
+  const targetDate = new Date(target.created_at);
+  
+  // Actor debe ser más antiguo (menor o igual fecha) que el objetivo
+  return actorDate <= targetDate;
+};
+
+/**
  * Retorna la clase CSS del badge según el nombre del rol.
- * Centraliza la lógica que antes estaba duplicada en GestionUsuarios y GestionRoles.
- * @param {string} roleName
- * @returns {string}
  */
 export const getBadgeClass = (roleName) => {
   if (!roleName) return 'badge-admin';
@@ -65,13 +110,11 @@ export const getBadgeClass = (roleName) => {
   if (upper === 'SUPER_ADMIN' || upper === 'ADMIN') return 'badge-admin';
   if (upper === 'CLIENTE') return 'badge-cliente';
   if (upper === 'EMPLEADO' || upper === 'GERENTE') return 'badge-empleado';
-  return 'badge-admin'; // Roles custom
+  return 'badge-admin';
 };
 
 /**
  * Retorna una etiqueta amigable para el rol.
- * @param {string} roleName
- * @returns {string}
  */
 export const getRoleLabel = (roleName) => {
   if (!roleName) return 'Sin rol';
@@ -85,29 +128,6 @@ export const getRoleLabel = (roleName) => {
   return labels[roleName.toUpperCase()] || roleName;
 };
 
-/**
- * Determina si un rol es de tipo "staff" (no cliente).
- * @param {string} roleName
- * @returns {boolean}
- */
-export const isStaffRole = (roleName) => {
-  return STAFF_ROLES.includes(roleName?.toUpperCase());
-};
-
-/**
- * Determina si un rol es de tipo "admin".
- * @param {string} roleName
- * @returns {boolean}
- */
-export const isAdminRole = (roleName) => {
-  return ADMIN_ROLES.includes(roleName?.toUpperCase());
-};
-
-/**
- * Determina si un rol es protegido (rol base del sistema).
- * @param {string} roleName
- * @returns {boolean}
- */
-export const isProtectedRole = (roleName) => {
-  return PROTECTED_ROLES.includes(roleName?.toUpperCase());
-};
+export const isStaffRole = (roleName) => STAFF_ROLES.includes(roleName?.toUpperCase());
+export const isAdminRole = (roleName) => ADMIN_ROLES.includes(roleName?.toUpperCase());
+export const isProtectedRole = (roleName) => PROTECTED_ROLES.includes(roleName?.toUpperCase());

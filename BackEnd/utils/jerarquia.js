@@ -1,6 +1,6 @@
 // ============================================
 // Utilidad: jerarquia.js
-// Lógica de jerarquía estricta de RBAC
+// Lógica de jerarquía estricta de RBAC y Gobernanza Bancaria
 // SUPER_ADMIN > ADMIN > GERENTE > EMPLEADO > CLIENTE
 // ============================================
 
@@ -13,28 +13,62 @@ const JERARQUIA = {
 };
 
 /**
- * Verifica si el rol de origen tiene permisos sobre el rol destino.
- * Regla: Ningún rol puede modificar a un usuario de igual o mayor jerarquía.
- * (Excepto SUPER_ADMIN que sí puede editar a otro SUPER_ADMIN si es necesario,
- * o a sí mismo).
- * 
- * @param {string} rolOrigen Nombre del rol que ejecuta la acción
- * @param {string} rolDestino Nombre del rol sobre el cual se ejecuta la acción
- * @returns {boolean} true si tiene permiso, false en caso contrario
+ * REGLA 1: Jerarquía de Modificación
+ * Ningún rol puede modificar a un usuario de igual o mayor jerarquía.
  */
 const puedeModificar = (rolOrigen, rolDestino) => {
   const pesoOrigen = JERARQUIA[rolOrigen] || 0;
   const pesoDestino = JERARQUIA[rolDestino] || 0;
 
-  if (rolOrigen === 'SUPER_ADMIN') {
-    return true; // El Super Admin tiene control total
+  if (rolOrigen === 'SUPER_ADMIN') return true;
+  return pesoOrigen > pesoDestino;
+};
+
+/**
+ * REGLA 2: Jerarquía de Creación (Reglas Bancarias Reales)
+ * Define qué roles puede crear cada nivel de usuario.
+ */
+const puedeCrearRol = (rolOrigen, rolACrear) => {
+  const origen = rolOrigen?.toUpperCase();
+  const destino = rolACrear?.toUpperCase();
+
+  if (origen === 'SUPER_ADMIN') return true; // Puede crear cualquier rol
+
+  if (origen === 'ADMIN') {
+    // Solo puede crear GERENTE, EMPLEADO, CLIENTE
+    return ['GERENTE', 'EMPLEADO', 'CLIENTE'].includes(destino);
   }
 
-  // Para el resto de roles, el peso de quien ejecuta debe ser MAYOR al peso del afectado
-  return pesoOrigen > pesoDestino;
+  if (origen === 'GERENTE') {
+    // Solo puede crear EMPLEADO, CLIENTE
+    return ['EMPLEADO', 'CLIENTE'].includes(destino);
+  }
+
+  if (origen === 'EMPLEADO') {
+    // Solo puede crear CLIENTE
+    return destino === 'CLIENTE';
+  }
+
+  return false; // CLIENTE y otros no pueden crear usuarios
+};
+
+/**
+ * REGLA 3: Protección de Seniority para SUPER_ADMIN
+ * Un SUPER_ADMIN más reciente NO puede desactivar a uno más antiguo.
+ */
+const esMasAntiguo = (usuarioActor, usuarioObjetivo) => {
+  if (usuarioActor.rol !== 'SUPER_ADMIN' || usuarioObjetivo.rol !== 'SUPER_ADMIN') return true;
+  
+  const fechaActor = new Date(usuarioActor.createdAt);
+  const fechaObjetivo = new Date(usuarioObjetivo.createdAt);
+
+  // Actor debe ser anterior o igual al objetivo para proceder
+  return fechaActor <= fechaObjetivo;
 };
 
 module.exports = {
   JERARQUIA,
-  puedeModificar
+  puedeModificar,
+  puedeCrearRol,
+  esMasAntiguo
 };

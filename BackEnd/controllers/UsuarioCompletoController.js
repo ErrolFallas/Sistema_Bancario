@@ -15,7 +15,7 @@
 const bcrypt = require('bcrypt');
 const { sequelize, Usuario, Rol, Cliente, Empleado, Banco } = require('../models');
 const { registrarAuditoria, descripcionCrearUsuario, descripcionCrearCliente, descripcionCrearEmpleado } = require('../utils/auditoria');
-const { puedeModificar } = require('../utils/jerarquia');
+const { puedeModificar, puedeCrearRol } = require('../utils/jerarquia');
 
 const SALT_ROUNDS = 10;
 
@@ -76,10 +76,43 @@ const crearUsuarioCompleto = async (req, res) => {
 
     const nombreRol = rol.nombre.toUpperCase();
 
-    // ── VALIDACIÓN DE JERARQUÍA ────────────────────────────────────
-    if (req.user && !puedeModificar(req.user.rol, nombreRol)) {
+    // ── REGLA DE GOBERNANZA: LÍMITE SUPER_ADMIN (MAX 2) ─────────────
+    if (nombreRol === 'SUPER_ADMIN') {
+      const totalSuperAdmins = await Usuario.count({
+        where: { cuentaActiva: true },
+        include: [{
+          model: Rol,
+          as: 'rol',
+          where: { nombre: 'SUPER_ADMIN' }
+        }],
+        transaction: t
+      });
+
+      if (totalSuperAdmins >= 2) {
+        await t.rollback();
+        // Auditoría del intento fallido
+        await registrarAuditoria({
+          idUsuario: req.user?.idUsuario || null,
+          accion: 'INTENTO_CREAR_SUPER_ADMIN',
+          tablaAfectada: 'USUARIOS',
+          descripcion: `Intento fallido de crear tercer SUPER_ADMIN. Límite alcanzado (2).`,
+          ip: req.ip,
+        });
+        return res.status(403).json({ error: 'Seguridad Bancaria: Se ha alcanzado el límite máximo de 2 SUPER_ADMIN activos en el sistema.' });
+      }
+    }
+
+    // ── VALIDACIÓN DE JERARQUÍA (CREACIÓN) ─────────────────────────
+    if (req.user && !puedeCrearRol(req.user.rol, nombreRol)) {
       await t.rollback();
-      return res.status(403).json({ error: `Operación denegada por jerarquía: Su rol (${req.user.rol}) no tiene permisos para crear usuarios con rol (${nombreRol}).` });
+      await registrarAuditoria({
+        idUsuario: req.user?.idUsuario || null,
+        accion: 'INTENTO_ESCALAMIENTO_PRIVILEGIOS',
+        tablaAfectada: 'USUARIOS',
+        descripcion: `Intento de creación de rol superior: ${req.user.rol} intentó crear ${nombreRol}`,
+        ip: req.ip,
+      });
+      return res.status(403).json({ error: `Jerarquía Bancaria: Su rol (${req.user.rol}) no tiene permisos para crear usuarios con nivel (${nombreRol}).` });
     }
 
     let idCliente = null;

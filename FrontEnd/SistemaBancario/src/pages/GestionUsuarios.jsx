@@ -126,7 +126,7 @@ const GestionUsuarios = () => {
             usuario={u}
             onDesactivar={handleDesactivar}
             onReactivar={handleReactivar}
-            currentUserRole={user?.rol}
+            currentUser={user}
           />
         )}
       />
@@ -144,7 +144,14 @@ const GestionUsuarios = () => {
               </p>
               {modal.action === 'desactivar' && (
                 <p style={{ marginTop: '0.5rem', color: 'var(--accent-color)', fontSize: '0.9rem' }}>
-                  El usuario no podrá iniciar sesión hasta ser reactivado.
+                  {modal.usuario.rol?.nombre?.toUpperCase() === 'ADMIN' && modal.usuario.idUsuario === user.idUsuario
+                    ? 'Al desactivar esta cuenta, solo un SUPER_ADMIN podrá reactivarla.'
+                    : 'El usuario no podrá iniciar sesión hasta ser reactivado.'}
+                </p>
+              )}
+              {modal.action === 'reactivar' && modal.usuario.rol?.nombre?.toUpperCase() === 'SUPER_ADMIN' && (
+                <p style={{ marginTop: '0.5rem', color: 'var(--secondary-color)', fontSize: '0.9rem' }}>
+                  Aviso: Solo un SUPER_ADMIN puede realizar esta acción para este nivel de cuenta.
                 </p>
               )}
             </>
