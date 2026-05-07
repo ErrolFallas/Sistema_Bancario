@@ -26,11 +26,21 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     // Extraer mensaje de error del backend o usar uno genérico
-    const message = error.response?.data?.error || error.response?.data?.mensaje || 'Error inesperado en el servidor';
+    const message = error.response?.data?.error || error.response?.data?.mensaje || 'Error inesperado en la comunicación con el servidor institucional.';
     
-    // Si el backend devuelve 401 o 403, forzamos logout automático
-    if (error.response?.status === 401 || error.response?.status === 403) {
-      console.warn('Sesión no autorizada, expirada o rol desactivado.');
+    // Si el backend devuelve 401, forzamos logout (Sesión expirada o inválida)
+    if (error.response?.status === 401) {
+      console.warn('Sesión expirada o no autorizada.');
+      window.dispatchEvent(new Event('session-expired'));
+    }
+
+    // Si el backend devuelve 403, solo forzamos logout si es un error de seguridad de sesión
+    // (Cuenta desactivada, token corrupto, etc.)
+    const sessionErrorKeywords = ['inactiva', 'suspendida', 'corrupto', 'inválido'];
+    const isSessionError = sessionErrorKeywords.some(keyword => message.toLowerCase().includes(keyword));
+
+    if (error.response?.status === 403 && isSessionError) {
+      console.warn('Acceso denegado por seguridad de cuenta o token.');
       window.dispatchEvent(new Event('session-expired'));
     }
 

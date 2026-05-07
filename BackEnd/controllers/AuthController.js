@@ -84,7 +84,7 @@ const login = async (req, res) => {
 
     // 9. Respuesta — ya no incluimos el token en el JSON por seguridad
     return res.status(200).json({
-      mensaje   : 'Login exitoso.',
+      mensaje   : 'Inicio de sesión exitoso. Bienvenido al sistema.',
       usuario: {
         idUsuario    : usuario.idUsuario,
         username     : usuario.username,
@@ -93,7 +93,7 @@ const login = async (req, res) => {
       },
     });
   } catch (error) {
-    return res.status(500).json({ error: 'Error interno del servidor al procesar la solicitud.', detalle: error.message });
+    return res.status(500).json({ error: 'Ocurrió un error interno del servidor al intentar procesar su inicio de sesión.', detalle: error.message });
   }
 };
 
@@ -138,12 +138,12 @@ const me = async (req, res) => {
     });
 
     if (!usuario) {
-      return res.status(404).json({ error: 'Error: No se pudo encontrar la información de su usuario en la base de datos. Verifique que su cuenta exista.' });
+      return res.status(404).json({ error: 'Error de búsqueda: No se pudo encontrar la información de su usuario en la base de datos empresarial. Verifique que su cuenta exista.' });
     }
 
     return res.status(200).json(usuario);
   } catch (error) {
-    return res.status(500).json({ error: 'Error interno del servidor al procesar la solicitud.', detalle: error.message });
+    return res.status(500).json({ error: 'Ocurrió un error interno del servidor al intentar obtener su perfil.', detalle: error.message });
   }
 };
 
@@ -269,13 +269,12 @@ const register = async (req, res) => {
   } catch (error) {
     // ── DOBLE VALIDACIÓN (CAPA BASE DE DATOS) ──
     if (error.name === 'SequelizeUniqueConstraintError') {
-      const campo = error.errors && error.errors[0] ? error.errors[0].path : '';
-      if (campo === 'email') {
-        return res.status(400).json({ error: 'El correo electrónico ya se encuentra registrado.' });
-      }
-      return res.status(400).json({ error: 'El nombre de usuario ya se encuentra registrado.' });
+      return res.status(400).json({ error: 'Error de unicidad: El nombre de usuario o correo electrónico ya se encuentra registrado en el sistema institucional.' });
     }
-    return res.status(500).json({ error: 'Error interno del servidor al registrar usuario.', detalle: error.message });
+    return res.status(500).json({
+      error: 'Ocurrió un error interno del servidor al intentar realizar el registro transaccional del usuario completo.',
+      detalle: error.message,
+    });
   }
 };
 

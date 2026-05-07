@@ -229,10 +229,10 @@ const crearUsuarioCompleto = async (req, res) => {
     console.error('[UsuarioCompletoController] Error:', error);
 
     if (error.name === 'SequelizeUniqueConstraintError') {
-      return res.status(400).json({ error: 'Error de unicidad: El nombre de usuario o correo electrónico ya se encuentra registrado.' });
+      return res.status(400).json({ error: 'Error de unicidad: El nombre de usuario o correo electrónico ya se encuentra registrado en el sistema institucional.' });
     }
     return res.status(500).json({
-      error: 'Error interno del servidor al crear usuario completo.',
+      error: 'Ocurrió un error interno del servidor al intentar realizar el registro transaccional del usuario completo.',
       detalle: error.message,
     });
   }

@@ -55,14 +55,17 @@ const autenticarToken = async (req, res, next) => {
       return res.status(403).json({ error: 'Su rol de acceso ha sido desactivado. Contacte al administrador del sistema.' });
     }
 
-    // 5. Adjuntar payload al request
-    req.user = payload; // { idUsuario, username, rol, cuentaActiva, idCliente, idEmpleado }
+    // 5. Adjuntar payload al request (Normalizado para consistencia)
+    req.user = {
+      ...payload,
+      rol: usuario.rol ? usuario.rol.nombre.toUpperCase() : (payload.rol ? payload.rol.toUpperCase() : null)
+    };
     next();
   } catch (err) {
     if (err.name === 'TokenExpiredError') {
       return res.status(401).json({ error: 'Acceso denegado. Su Token ha expirado, por favor inicie sesión nuevamente.' });
     }
-    return res.status(403).json({ error: 'Acceso denegado. El Token proporcionado es inválido o está corrupto.' });
+    return res.status(403).json({ error: 'Acceso denegado por seguridad: El Token proporcionado es inválido o está corrupto.' });
   }
 };
 

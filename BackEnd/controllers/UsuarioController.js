@@ -265,8 +265,15 @@ const actualizarUsuario = async (req, res) => {
     // Validar reglas por rol (solo si se está cambiando rol o relaciones)
     if (req.body.idRol || req.body.hasOwnProperty('idCliente') || req.body.hasOwnProperty('idEmpleado')) {
       const validacion = await validarReglasRol(nuevoIdRol, nuevoIdCliente, nuevoIdEmpleado);
+      
       if (!validacion.valido) {
-        return res.status(validacion.status).json({ error: validacion.error });
+        // PERMITIR PROMOCIÓN SI EL ACTOR ES SUPER_ADMIN (Gobernanza Bancaria)
+        const actorRol = req.user?.rol?.toUpperCase();
+        if (validacion.requiereSuperAdmin && actorRol === 'SUPER_ADMIN') {
+          // Bypass permitido: Super Admin puede otorgar privilegios de Super Admin
+        } else {
+          return res.status(validacion.status).json({ error: validacion.error });
+        }
       }
     }
 
@@ -340,15 +347,16 @@ const actualizarUsuario = async (req, res) => {
       const rolSolicitado = await Rol.findByPk(req.body.idRol);
       const nombreRolSolicitado = rolSolicitado?.nombre?.toUpperCase();
 
-      if (rolSolicitado && req.user && !puedeCrearRol(req.user.rol, nombreRolSolicitado)) {
+      const actorRol = req.user?.rol?.toUpperCase();
+      if (rolSolicitado && actorRol && !puedeCrearRol(actorRol, nombreRolSolicitado)) {
         await registrarAuditoria({
           idUsuario: req.user.idUsuario,
           accion: 'INTENTO_ESCALAMIENTO_PRIVILEGIOS',
           tablaAfectada: 'USUARIOS',
-          descripcion: `Intento de promoción prohibida: ${req.user.rol} intentó promover a ${nombreRolSolicitado}`,
+          descripcion: `Intento de promoción prohibida: ${actorRol} intentó promover a ${nombreRolSolicitado}`,
           ip: req.ip,
         });
-        return res.status(403).json({ error: `Jerarquía Bancaria: Su rol (${req.user.rol}) no tiene permisos para promover a un usuario al nivel (${nombreRolSolicitado}).` });
+        return res.status(403).json({ error: `Jerarquía Bancaria: Su rol (${actorRol}) no tiene permisos para promover a un usuario al nivel (${nombreRolSolicitado}).` });
       }
 
       // --- REGLA DE GOBERNANZA: LÍMITE SUPER_ADMIN (MAX 2) EN PROMOCIÓN ---
@@ -363,10 +371,10 @@ const actualizarUsuario = async (req, res) => {
             idUsuario: req.user.idUsuario,
             accion: 'INTENTO_PROMOCION_SUPER_ADMIN_FALLIDO',
             tablaAfectada: 'USUARIOS',
-            descripcion: `Intento de promoción a SUPER_ADMIN fallido por límite (2). Usuario objetivo: ${usuario.username}`,
+            descripcion: `Intento de promoción a SUPER_ADMIN fallido por límite de cuórum (2). Usuario objetivo: ${usuario.username}`,
             ip: req.ip,
           });
-          return res.status(403).json({ error: 'Seguridad Bancaria: No se puede promover a este usuario. Se ha alcanzado el límite máximo de 2 SUPER_ADMIN activos.' });
+          return res.status(403).json({ error: 'Seguridad Bancaria: No se puede promover el usuario a SUPER_ADMIN porque ya existen 2 SUPER_ADMIN activos.' });
         }
       }
     }
@@ -381,12 +389,15 @@ const actualizarUsuario = async (req, res) => {
     await usuario.update(req.body);
 
     const { passwordHash: _, ...actualizado } = usuario.toJSON();
-    return res.status(200).json(actualizado);
+    return res.status(200).json({
+      mensaje: 'Usuario actualizado exitosamente.',
+      usuario: actualizado
+    });
   } catch (error) {
     if (error.name === 'SequelizeUniqueConstraintError') {
-      return res.status(400).json({ error: 'Error de unicidad: El nombre de usuario o correo electrónico ya se encuentra registrado.' });
+      return res.status(400).json({ error: 'Error de unicidad: El nombre de usuario o correo electrónico ya se encuentra registrado en el sistema.' });
     }
-    return res.status(400).json({ error: 'Error de validación en los datos enviados.', detalle: error.message });
+    return res.status(500).json({ error: 'Ocurrió un error interno del servidor al intentar actualizar el usuario.', detalle: error.message });
   }
 };
 
@@ -451,10 +462,10 @@ const desactivarCuenta = async (req, res) => {
     await usuario.update({ cuentaActiva: false, usuarioLogeado: false });
 
     return res.status(200).json({
-      mensaje: 'Cuenta desactivada exitosamente. Ya no podrá iniciar sesión.',
+      mensaje: 'Cuenta desactivada exitosamente. Ya no podrá iniciar sesión en el sistema.',
     });
   } catch (error) {
-    return res.status(500).json({ error: 'Error interno del servidor al procesar la solicitud.', detalle: error.message });
+    return res.status(500).json({ error: 'Ocurrió un error interno del servidor al intentar desactivar la cuenta.', detalle: error.message });
   }
 };
 
