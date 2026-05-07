@@ -196,38 +196,35 @@ const CrearUsuario = () => {
   }
 
   return (
-    <div className="page-container" style={{ display: 'flex', justifyContent: 'center' }}>
-      <div className="glass-card" style={{ width: '100%', maxWidth: '720px' }}>
-        <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-          <h2 style={{
-            fontSize: '2rem', fontWeight: 700,
-            background: 'linear-gradient(90deg, #fff, var(--secondary-color))',
-            WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent'
-          }}>
-            Crear Usuario
-          </h2>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', marginTop: '0.3rem' }}>
-            Formulario inteligente — un solo envío crea todo
-          </p>
-        </div>
+    <div className="page-container center-content">
+      <div className="form-card animate-in">
+        <header className="form-header">
+          <div className="header-icon">👤</div>
+          <div className="header-text">
+            <h2>Crear Usuario</h2>
+            <p>Formulario inteligente para gestión de personal y clientes</p>
+          </div>
+        </header>
 
         {error && <div className="alert alert-error">{error}</div>}
         {success && <div className="alert alert-success">{success}</div>}
 
-        <form onSubmit={handleSubmit}>
-
+        <form onSubmit={handleSubmit} className="enterprise-form">
           {/* ── SECCIÓN 1: Credenciales ────────────────────── */}
-          <div className="form-section">
-            <h4 style={{ color: 'var(--text-light)', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <span>🔐</span> Credenciales de Acceso
-            </h4>
-            <div className="form-row">
+          <section className="form-section">
+            <div className="section-title">
+              <span className="icon">🔐</span>
+              <h3>Credenciales de Acceso</h3>
+            </div>
+            
+            <div className="form-grid">
               <div className="form-group">
                 <label htmlFor="username">Nombre de Usuario *</label>
                 <input
                   type="text" id="username" name="username"
                   value={formData.username} onChange={handleChange}
-                  placeholder="Ej. juanperez" disabled={isLoading}
+                  placeholder="Ej. juan.perez" disabled={isLoading}
+                  required
                 />
               </div>
               <div className="form-group">
@@ -236,45 +233,49 @@ const CrearUsuario = () => {
                   type="password" id="password" name="password"
                   value={formData.password} onChange={handleChange}
                   placeholder="Mínimo 6 caracteres" disabled={isLoading}
+                  required
                 />
               </div>
             </div>
-            <div className="form-row">
+
+            <div className="form-grid">
               <div className="form-group">
-                <label htmlFor="idRol">Rol a Asignar *</label>
+                <label htmlFor="idRol">Rol del Sistema *</label>
                 <select
                   id="idRol" name="idRol"
                   value={formData.idRol} onChange={handleChange}
                   disabled={isLoading}
+                  required
                 >
-                  <option value="">— Seleccionar Rol —</option>
+                  <option value="">Seleccionar Rol</option>
                   {rolesDisponibles.map(rol => (
                     <option key={rol.idRol} value={rol.idRol}>
-                      {rol.nombre} {rol.descripcion ? `— ${rol.descripcion}` : ''}
+                      {rol.nombre}
                     </option>
                   ))}
                 </select>
               </div>
               <div className="form-group">
-                <label htmlFor="usuarioEmail">Correo Electrónico (Opcional)</label>
+                <label htmlFor="usuarioEmail">Email de Usuario</label>
                 <input
                   type="email" id="usuarioEmail" name="usuarioEmail"
                   value={formData.usuarioEmail} onChange={handleChange}
-                  placeholder="usuario@banco.com" disabled={isLoading}
+                  placeholder="email@ejemplo.com" disabled={isLoading}
                 />
               </div>
             </div>
-          </div>
+          </section>
 
           {/* ── SECCIÓN 2: Cliente (condicional) ────────────── */}
           {mostrarCamposCliente && (
-            <div className="form-section section-cliente animate-in" style={{ borderLeft: '4px solid var(--secondary-color)', background: 'rgba(0, 180, 216, 0.05)' }}>
-              <h4 style={{ color: 'var(--secondary-color)', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <span>👤</span> Datos Personales del Cliente
-              </h4>
-              <div className="form-row">
+            <section className="form-section highlight-blue animate-in">
+              <div className="section-title">
+                <span className="icon">💼</span>
+                <h3>Datos del Cliente</h3>
+              </div>
+              <div className="form-grid">
                 <div className="form-group">
-                  <label htmlFor="clienteNombre">Nombre *</label>
+                  <label htmlFor="clienteNombre">Nombre(s) *</label>
                   <input
                     type="text" id="clienteNombre" name="clienteNombre"
                     value={formData.clienteNombre} onChange={handleChange}
@@ -282,7 +283,7 @@ const CrearUsuario = () => {
                   />
                 </div>
                 <div className="form-group">
-                  <label htmlFor="clienteApellido">Apellido *</label>
+                  <label htmlFor="clienteApellido">Apellido(s) *</label>
                   <input
                     type="text" id="clienteApellido" name="clienteApellido"
                     value={formData.clienteApellido} onChange={handleChange}
@@ -290,44 +291,46 @@ const CrearUsuario = () => {
                   />
                 </div>
               </div>
-              <div className="form-row">
+              <div className="form-grid">
                 <div className="form-group">
-                  <label htmlFor="clienteCedula">Identidad (Cédula) *</label>
+                  <label htmlFor="clienteCedula">Identificación *</label>
                   <input
                     type="text" id="clienteCedula" name="clienteCedula"
                     value={formData.clienteCedula} onChange={handleChange}
-                    placeholder="Ej. 1-1234-5678" disabled={isLoading}
+                    placeholder="0-0000-0000" disabled={isLoading}
                   />
                 </div>
                 <div className="form-group">
-                  <label htmlFor="clienteTelefono">Teléfono de Contacto</label>
+                  <label htmlFor="clienteTelefono">Teléfono</label>
                   <input
                     type="text" id="clienteTelefono" name="clienteTelefono"
                     value={formData.clienteTelefono} onChange={handleChange}
-                    placeholder="8888-8888" disabled={isLoading}
+                    placeholder="0000-0000" disabled={isLoading}
                   />
                 </div>
               </div>
-              <div className="form-group" style={{ marginBottom: 0 }}>
-                <label htmlFor="clienteDireccion">Dirección Física</label>
-                <input
-                  type="text" id="clienteDireccion" name="clienteDireccion"
+              <div className="form-group full-width">
+                <label htmlFor="clienteDireccion">Dirección Completa</label>
+                <textarea
+                  id="clienteDireccion" name="clienteDireccion"
                   value={formData.clienteDireccion} onChange={handleChange}
-                  placeholder="San José, Costa Rica" disabled={isLoading}
+                  placeholder="Provincia, Cantón, Distrito..." disabled={isLoading}
+                  rows="2"
                 />
               </div>
-            </div>
+            </section>
           )}
 
           {/* ── SECCIÓN 3: Empleado (condicional) ──────────── */}
           {mostrarCamposEmpleado && (
-            <div className="form-section section-empleado animate-in" style={{ borderLeft: '4px solid var(--accent-color)', background: 'rgba(255, 183, 3, 0.05)' }}>
-              <h4 style={{ color: 'var(--accent-color)', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <span>🏢</span> Ficha del Empleado
-              </h4>
-              <div className="form-row">
+            <section className="form-section highlight-gold animate-in">
+              <div className="section-title">
+                <span className="icon">🏛️</span>
+                <h3>Ficha de Empleado</h3>
+              </div>
+              <div className="form-grid">
                 <div className="form-group">
-                  <label htmlFor="empleadoNombre">Nombre *</label>
+                  <label htmlFor="empleadoNombre">Nombre(s) *</label>
                   <input
                     type="text" id="empleadoNombre" name="empleadoNombre"
                     value={formData.empleadoNombre} onChange={handleChange}
@@ -335,7 +338,7 @@ const CrearUsuario = () => {
                   />
                 </div>
                 <div className="form-group">
-                  <label htmlFor="empleadoApellido">Apellido *</label>
+                  <label htmlFor="empleadoApellido">Apellido(s) *</label>
                   <input
                     type="text" id="empleadoApellido" name="empleadoApellido"
                     value={formData.empleadoApellido} onChange={handleChange}
@@ -343,56 +346,60 @@ const CrearUsuario = () => {
                   />
                 </div>
               </div>
-              <div className="form-row" style={{ marginBottom: 0 }}>
+              <div className="form-grid">
                 <div className="form-group">
-                  <label htmlFor="empleadoTelefono">Teléfono del Empleado</label>
+                  <label htmlFor="empleadoTelefono">Teléfono Interno</label>
                   <input
                     type="text" id="empleadoTelefono" name="empleadoTelefono"
                     value={formData.empleadoTelefono} onChange={handleChange}
-                    placeholder="8888-8888" disabled={isLoading}
+                    placeholder="Ext. 0000" disabled={isLoading}
                   />
                 </div>
                 <div className="form-group">
-                  <label htmlFor="empleadoIdBanco">Institución Bancaria *</label>
+                  <label htmlFor="empleadoIdBanco">Banco Asignado *</label>
                   <select
                     id="empleadoIdBanco" name="empleadoIdBanco"
                     value={formData.empleadoIdBanco} onChange={handleChange}
                     disabled={isLoading}
                   >
-                    <option value="">— Seleccionar Banco —</option>
+                    <option value="">Seleccionar Banco</option>
                     {bancos.map(banco => (
                       <option key={banco.idBanco} value={banco.idBanco}>
-                        {banco.nombre} ({banco.codigo})
+                        {banco.nombre}
                       </option>
                     ))}
                   </select>
                 </div>
               </div>
-            </div>
+            </section>
           )}
 
-          {/* ── Indicador visual ────────────────────────────── */}
-          {formData.idRol && (
-            <div className="form-preview">
-              <span>📋 Se creará:</span>
-              <strong>
-                {mostrarCamposCliente && ' Cliente →'}
-                {mostrarCamposEmpleado && ' Empleado →'}
-                {' Usuario'}
-                {rolSeleccionado && ` (${rolSeleccionado})`}
-              </strong>
+          <footer className="form-footer">
+            <div className="form-summary">
+              {formData.idRol ? (
+                <p>Configuración: <strong>{rolSeleccionado}</strong></p>
+              ) : (
+                <p>Complete los datos para continuar</p>
+              )}
             </div>
-          )}
-
-          {/* ── Botones ─────────────────────────────────────── */}
-          <div className="form-actions">
-            <button type="button" className="btn-secondary" onClick={() => navigate('/usuarios')} disabled={isLoading}>
-              Cancelar
-            </button>
-            <button type="submit" className="btn-primary" disabled={isLoading}>
-              {isLoading ? 'Procesando transacción...' : 'Crear Usuario'}
-            </button>
-          </div>
+            <div className="form-actions">
+              <button 
+                type="button" 
+                className="btn-secondary" 
+                onClick={() => navigate('/usuarios')} 
+                disabled={isLoading}
+              >
+                Cancelar
+              </button>
+              <button 
+                type="submit" 
+                className="btn-primary btn-large" 
+                disabled={isLoading || !formData.idRol}
+              >
+                {isLoading ? 'Procesando...' : 'Crear Usuario'}
+              </button>
+            </div>
+          </footer>
         </form>
       </div>
     </div>

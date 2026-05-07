@@ -79,25 +79,6 @@ const inicializarDatosBase = async () => {
     }
     
     console.log("✅ Asignación de permisos base verificada.");
-
-    // 6. Opcional: Crear un usuario SUPER_ADMIN por defecto si la tabla de usuarios está vacía
-    const usuariosCount = await Usuario.count();
-    if (usuariosCount === 0) {
-      const superAdminRol = getRol("SUPER_ADMIN");
-      if (superAdminRol) {
-        const salt = await bcrypt.genSalt(10);
-        const hashedPassword = await bcrypt.hash("admin123", salt);
-        
-        await Usuario.create({
-          username: "admin",
-          password: hashedPassword,
-          idRol: superAdminRol.idRol,
-          cuentaActiva: true
-        });
-        console.log("👑 Usuario SUPER_ADMIN por defecto creado (user: admin, pass: admin123)");
-      }
-    }
-
   } catch (error) {
     console.error("❌ Error al inicializar datos base:", error);
   }

@@ -53,84 +53,86 @@ const Navbar = () => {
 
   return (
     <nav className="navbar">
-      <div className="navbar-brand">
-        <Link to="/" onClick={closeMenu}>🏦 {nombreBanco}</Link>
-      </div>
+      <div className="navbar-container">
+        <div className="navbar-brand">
+          <Link to="/" onClick={closeMenu}>🏦 {nombreBanco}</Link>
+        </div>
 
-      {/* Hamburguesa responsive */}
-      {user && (
-        <button
-          className="navbar-toggle"
-          onClick={() => setMenuOpen(!menuOpen)}
-          aria-label="Menú"
-        >
-          <span className={`hamburger ${menuOpen ? 'open' : ''}`} />
-        </button>
-      )}
-
-      <div className={`navbar-menu ${menuOpen ? 'active' : ''}`}>
-        {user ? (
-          <>
-            {/* ── Sección Personal (todos) ──────────── */}
-            <Link to="/mi-cuenta" className="nav-item" onClick={closeMenu}>Mi Cuenta</Link>
-
-            {/* ── CLIENTE: solo sus recursos ────────── */}
-            {isCliente && (
-              <>
-                <Link to="/mis-cuentas" className="nav-item" onClick={closeMenu}>Mis Cuentas</Link>
-                <Link to="/mis-tarjetas" className="nav-item" onClick={closeMenu}>Mis Tarjetas</Link>
-                <Link to="/mis-prestamos" className="nav-item" onClick={closeMenu}>Mis Préstamos</Link>
-              </>
-            )}
-
-            {/* ── Staff: Operaciones ────────────────── */}
-            {isStaff && (
-              <>
-                <div className="nav-divider" />
-                <Link to="/clientes" className="nav-item" onClick={closeMenu}>Clientes</Link>
-                <Link to="/cuentas" className="nav-item" onClick={closeMenu}>Cuentas</Link>
-                <Link to="/tarjetas" className="nav-item" onClick={closeMenu}>Tarjetas</Link>
-                <Link to="/usuarios" className="nav-item" onClick={closeMenu}>Usuarios</Link>
-              </>
-            )}
-
-            {/* ── Gerencia+: Gestión avanzada ──────── */}
-            {isManagement && (
-              <>
-                <Link to="/prestamos" className="nav-item" onClick={closeMenu}>Préstamos</Link>
-                <Link to="/transacciones" className="nav-item" onClick={closeMenu}>Transacciones</Link>
-              </>
-            )}
-
-            {/* ── Admin+: Administración ────────────── */}
-            {isAdmin && (
-              <>
-                <div className="nav-divider" />
-                <Link to="/bancos" className="nav-item" onClick={closeMenu}>Bancos</Link>
-                <Link to="/auditoria" className="nav-item" onClick={closeMenu}>Auditoría</Link>
-              </>
-            )}
-
-            {/* ── SUPER_ADMIN: Roles ───────────────── */}
-            {isSuperAdmin && (
-              <Link to="/roles" className="nav-item" onClick={closeMenu}>Roles</Link>
-            )}
-
-            {/* ── User badge + logout ──────────────── */}
-            <div className="navbar-user">
-              <span className="user-badge">
-                👤 {user.username} <small>({user.rol})</small>
-              </span>
-              <button onClick={handleLogout} className="btn-logout">
-                Cerrar Sesión
-              </button>
-            </div>
-          </>
-        ) : (
-          <Link to="/login" className="btn-login" onClick={closeMenu}>
-            Iniciar Sesión
-          </Link>
+        {/* Hamburguesa responsive */}
+        {user && (
+          <button
+            className="navbar-toggle"
+            onClick={() => setMenuOpen(!menuOpen)}
+            aria-label="Menú"
+          >
+            <span className={`hamburger ${menuOpen ? 'open' : ''}`} />
+          </button>
         )}
+
+        <div className={`navbar-menu ${menuOpen ? 'active' : ''}`}>
+          {user ? (
+            <>
+              {/* ── CENTRAL NAVIGATION GROUP ─────────── */}
+              <div className="nav-links">
+                <Link to="/mi-cuenta" className="nav-item" onClick={closeMenu}>Mi Cuenta</Link>
+
+                {isCliente && (
+                  <>
+                    <div className="nav-divider" />
+                    <Link to="/mis-cuentas" className="nav-item" onClick={closeMenu}>Cuentas</Link>
+                    <Link to="/mis-tarjetas" className="nav-item" onClick={closeMenu}>Tarjetas</Link>
+                  </>
+                )}
+
+                {isStaff && (
+                  <>
+                    <div className="nav-divider" />
+                    <Link to="/clientes" className="nav-item" onClick={closeMenu}>Clientes</Link>
+                    <Link to="/cuentas" className="nav-item" onClick={closeMenu}>Cuentas</Link>
+                    <Link to="/usuarios" className="nav-item" onClick={closeMenu}>Usuarios</Link>
+                  </>
+                )}
+
+                {isManagement && (
+                  <>
+                    <Link to="/prestamos" className="nav-item" onClick={closeMenu}>Préstamos</Link>
+                    <Link to="/transacciones" className="nav-item" onClick={closeMenu}>Transacciones</Link>
+                  </>
+                )}
+
+                {(isAdmin || isSuperAdmin) && (
+                  <>
+                    <div className="nav-divider" />
+                    <Link to="/bancos" className="nav-item" onClick={closeMenu}>Bancos</Link>
+                    <Link to="/auditoria" className="nav-item" onClick={closeMenu}>Logs</Link>
+                    {isSuperAdmin && <Link to="/roles" className="nav-item" onClick={closeMenu}>Roles</Link>}
+                  </>
+                )}
+              </div>
+
+              {/* ── USER & SESSION GROUP (RIGHT) ─────── */}
+              <div className="navbar-user">
+                <div className="user-badge">
+                  <span className="user-icon">👤</span>
+                  <div className="user-info">
+                    <span className="user-name">{user.username}</span>
+                    <span className="user-role">{user.rol}</span>
+                  </div>
+                </div>
+                <button onClick={handleLogout} className="btn-logout" title="Cerrar Sesión">
+                  <span className="logout-icon">🚪</span>
+                  <span className="logout-text">Cerrar Sesión</span>
+                </button>
+              </div>
+            </>
+          ) : (
+            <div className="navbar-auth">
+              <Link to="/login" className="btn-login" onClick={closeMenu}>
+                Acceso Sistema
+              </Link>
+            </div>
+          )}
+        </div>
       </div>
     </nav>
   );
