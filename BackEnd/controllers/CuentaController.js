@@ -76,7 +76,6 @@ const buscarCuentas = async (req, res) => {
         },
       ],
       where: {}
-      where: {}
     };
 
     if (!(req.query.includeInactive === 'true' && req.user && ['SUPER_ADMIN', 'ADMIN'].includes(req.user.rol))) {
