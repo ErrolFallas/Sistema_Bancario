@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useToastContext } from '../context/ToastContext';
 import usuarioService from '../services/usuarioService';
 import rolService from '../services/rolService';
 import bancoService from '../services/bancoService';
+import { canModify } from '../helpers/roleHelpers';
 import '../css/forms.css';
 import '../css/dashboard.css';
 
@@ -20,6 +22,7 @@ import '../css/dashboard.css';
  */
 const CrearUsuario = () => {
   const { user } = useAuth();
+  const toast = useToastContext();
   const navigate = useNavigate();
 
   // ── Estado del formulario ──────────────────────────────────────
@@ -152,6 +155,7 @@ const CrearUsuario = () => {
       }
 
       const resultado = await usuarioService.createCompleto(payload);
+      toast.success(resultado.mensaje || 'Usuario creado exitosamente.');
       setSuccess(`✅ ${resultado.mensaje}`);
 
       // Limpiar formulario
@@ -163,17 +167,23 @@ const CrearUsuario = () => {
       });
 
     } catch (err) {
-      setError(err.message || 'Error al crear el usuario. Verifique los datos e intente de nuevo.');
+      const msg = err.message || 'Error al crear el usuario. Verifique los datos e intente de nuevo.';
+      toast.error(msg);
+      setError(msg);
     } finally {
       setIsLoading(false);
     }
   };
 
   // ── Filtrar roles que este usuario puede asignar ───────────────
+  // Filtrar roles usando jerarquía: solo puede asignar roles inferiores
   const rolesDisponibles = roles.filter(r => {
     const nombre = r.nombre.toUpperCase();
-    if (nombre === 'SUPER_ADMIN' && user?.rol !== 'SUPER_ADMIN') return false;
-    return true;
+    if (!user?.rol) return false;
+    // SUPER_ADMIN puede asignar cualquier rol
+    if (user.rol === 'SUPER_ADMIN') return true;
+    // Los demás solo roles sobre los que tienen jerarquía
+    return canModify(user.rol, nombre);
   });
 
   if (loadingDatos) {

@@ -8,8 +8,9 @@ const usuarioService = {
   /**
    * Listar todos los usuarios (Requiere permisos de ADMIN/SUPER_ADMIN)
    */
-  getAll: async () => {
-    const response = await api.get('/usuarios');
+  getAll: async (includeInactive = false) => {
+    const params = includeInactive ? '?includeInactive=true' : '';
+    const response = await api.get(`/usuarios${params}`);
     return response.data;
   },
 

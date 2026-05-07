@@ -1,16 +1,21 @@
 import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useToastContext } from '../context/ToastContext';
 import '../css/login.css';
 import '../css/forms.css';
 
+/**
+ * Login — Página de acceso seguro
+ * Refactorizado: usa toast para errores, prevención doble submit.
+ */
 const Login = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  
+
   const { login } = useAuth();
+  const toast = useToastContext();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -18,24 +23,28 @@ const Login = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
-    setIsLoading(true);
+    if (isLoading) return; // Prevención doble submit
 
     try {
       if (!username.trim()) {
-        throw new Error('El nombre de usuario es obligatorio.');
+        toast.warning('El nombre de usuario es obligatorio.');
+        return;
       }
       if (!password) {
-        throw new Error('La contraseña es obligatoria.');
+        toast.warning('La contraseña es obligatoria.');
+        return;
       }
       if (username.trim().length < 3) {
-        throw new Error('El usuario debe tener al menos 3 caracteres.');
+        toast.warning('El usuario debe tener al menos 3 caracteres.');
+        return;
       }
 
+      setIsLoading(true);
       await login({ username: username.trim(), password });
+      toast.success('Sesión iniciada correctamente.');
       navigate(from, { replace: true });
     } catch (err) {
-      setError(err.message || 'Error al iniciar sesión. Verifica tus credenciales.');
+      toast.error(err.message || 'Error al iniciar sesión. Verifica tus credenciales.');
     } finally {
       setIsLoading(false);
     }
@@ -44,16 +53,15 @@ const Login = () => {
   return (
     <div className="login-container">
       <div className="login-card">
+        <div style={{ textAlign: 'center', marginBottom: '0.5rem', fontSize: '2.5rem' }}>🏦</div>
         <h2>Acceso Seguro</h2>
         <p className="login-subtitle">Ingresa tus credenciales para continuar</p>
 
-        {error && <div className="alert alert-error">{error}</div>}
-
         <form onSubmit={handleSubmit}>
           <div className="form-group">
-            <label htmlFor="username">Usuario</label>
+            <label htmlFor="login-username">Usuario</label>
             <input
-              type="text" id="username"
+              type="text" id="login-username"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               placeholder="Ej. juanperez"
@@ -63,9 +71,9 @@ const Login = () => {
           </div>
 
           <div className="form-group">
-            <label htmlFor="password">Contraseña</label>
+            <label htmlFor="login-password">Contraseña</label>
             <input
-              type="password" id="password"
+              type="password" id="login-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
@@ -74,7 +82,12 @@ const Login = () => {
             />
           </div>
 
-          <button type="submit" className="btn-primary" disabled={isLoading} style={{ width: '100%', marginTop: '0.5rem' }}>
+          <button
+            type="submit"
+            className="btn-primary"
+            disabled={isLoading}
+            style={{ width: '100%', marginTop: '0.5rem' }}
+          >
             {isLoading ? 'Verificando...' : 'Iniciar Sesión'}
           </button>
         </form>

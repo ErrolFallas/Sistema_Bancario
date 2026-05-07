@@ -5,8 +5,9 @@ import api from './api';
  * CRUD completo — consume /roles (endpoints existentes del backend)
  */
 const rolService = {
-  getAll: async () => {
-    const response = await api.get('/roles');
+  getAll: async (includeInactive = false) => {
+    const params = includeInactive ? '?includeInactive=true' : '';
+    const response = await api.get(`/roles${params}`);
     return response.data;
   },
 

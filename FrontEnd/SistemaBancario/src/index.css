@@ -12,6 +12,7 @@
   --text-muted: #adb5bd;
   --error-color: #ef233c;
   --success-color: #06d6a0;
+  --warning-color: #ffb703;
   
   --font-family: 'Inter', system-ui, -apple-system, sans-serif;
   --transition-smooth: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);

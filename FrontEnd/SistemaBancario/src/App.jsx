@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
+import { ToastProvider } from './context/ToastContext';
 import ProtectedRoute from './routes/ProtectedRoute';
 
 // Componentes
@@ -9,58 +10,80 @@ import Navbar from './components/Navbar';
 import Home from './pages/Home';
 import Login from './pages/Login';
 import Unauthorized from './pages/Unauthorized';
+import MiCuenta from './pages/MiCuenta';
 import GestionUsuarios from './pages/GestionUsuarios';
 import CrearUsuario from './pages/CrearUsuario';
+import EditarUsuario from './pages/EditarUsuario';
 import GestionRoles from './pages/GestionRoles';
+import GestionClientes from './pages/GestionClientes';
+import GestionCuentas from './pages/GestionCuentas';
+import GestionTarjetas from './pages/GestionTarjetas';
+import GestionPrestamos from './pages/GestionPrestamos';
+import GestionTransacciones from './pages/GestionTransacciones';
+import GestionBancos from './pages/GestionBancos';
+import HistorialAuditoria from './pages/HistorialAuditoria';
+
+// CSS global de componentes compartidos
+import './css/components.css';
 
 function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
-        <Navbar />
-        <main>
-          <Routes>
-            {/* ── Rutas Públicas ────────────────────────────── */}
-            <Route path="/" element={<Home />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/unauthorized" element={<Unauthorized />} />
+      <ToastProvider>
+        <BrowserRouter>
+          <Navbar />
+          <main>
+            <Routes>
+              {/* ── Rutas Públicas ────────────────────────────── */}
+              <Route path="/" element={<Home />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/unauthorized" element={<Unauthorized />} />
 
-            {/* ── Cualquier usuario logeado ──────────────────── */}
-            <Route element={<ProtectedRoute />}>
-              <Route path="/mi-cuenta" element={
-                <div style={{padding: '2rem 5%'}}>
-                  <h1>Mi Cuenta</h1>
-                  <p style={{color: 'var(--text-muted)', marginTop: '1rem'}}>
-                    Configuración de perfil próximamente.
-                  </p>
-                </div>
-              } />
-            </Route>
+              {/* ── Cualquier usuario autenticado ──────────────── */}
+              <Route element={<ProtectedRoute />}>
+                <Route path="/mi-cuenta" element={<MiCuenta />} />
+              </Route>
 
-            {/* ── Staff bancario (ADMIN, GERENTE, EMPLEADO) ──── */}
-            <Route element={<ProtectedRoute allowedRoles={['SUPER_ADMIN', 'ADMIN', 'GERENTE', 'EMPLEADO']} />}>
-              <Route path="/clientes" element={
-                <div style={{padding: '2rem 5%'}}>
-                  <h1>Gestión de Clientes</h1>
-                  <p style={{color: 'var(--text-muted)', marginTop: '1rem'}}>
-                    Módulo de gestión de clientes próximamente.
-                  </p>
-                </div>
-              } />
-              <Route path="/usuarios" element={<GestionUsuarios />} />
-              <Route path="/usuarios/crear" element={<CrearUsuario />} />
-            </Route>
+              {/* ── CLIENTE: recursos propios (ownership) ──────── */}
+              <Route element={<ProtectedRoute allowedRoles={['SUPER_ADMIN', 'ADMIN', 'GERENTE', 'EMPLEADO', 'CLIENTE']} />}>
+                <Route path="/mis-cuentas" element={<GestionCuentas ownership />} />
+                <Route path="/mis-tarjetas" element={<GestionTarjetas ownership />} />
+                <Route path="/mis-prestamos" element={<GestionPrestamos ownership />} />
+              </Route>
 
-            {/* ── Solo SUPER_ADMIN ──────────────────────────── */}
-            <Route element={<ProtectedRoute allowedRoles={['SUPER_ADMIN']} />}>
-              <Route path="/roles" element={<GestionRoles />} />
-            </Route>
+              {/* ── Staff bancario (ADMIN, GERENTE, EMPLEADO) ──── */}
+              <Route element={<ProtectedRoute allowedRoles={['SUPER_ADMIN', 'ADMIN', 'GERENTE', 'EMPLEADO']} />}>
+                <Route path="/clientes" element={<GestionClientes />} />
+                <Route path="/cuentas" element={<GestionCuentas />} />
+                <Route path="/tarjetas" element={<GestionTarjetas />} />
+                <Route path="/usuarios" element={<GestionUsuarios />} />
+                <Route path="/usuarios/crear" element={<CrearUsuario />} />
+                <Route path="/usuarios/:id/editar" element={<EditarUsuario />} />
+              </Route>
 
-            {/* ── Fallback ──────────────────────────────────── */}
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </main>
-      </BrowserRouter>
+              {/* ── Gerencia+ ─────────────────────────────────── */}
+              <Route element={<ProtectedRoute allowedRoles={['SUPER_ADMIN', 'ADMIN', 'GERENTE']} />}>
+                <Route path="/prestamos" element={<GestionPrestamos />} />
+                <Route path="/transacciones" element={<GestionTransacciones />} />
+              </Route>
+
+              {/* ── Admin+ ────────────────────────────────────── */}
+              <Route element={<ProtectedRoute allowedRoles={['SUPER_ADMIN', 'ADMIN']} />}>
+                <Route path="/bancos" element={<GestionBancos />} />
+                <Route path="/auditoria" element={<HistorialAuditoria />} />
+              </Route>
+
+              {/* ── Solo SUPER_ADMIN ──────────────────────────── */}
+              <Route element={<ProtectedRoute allowedRoles={['SUPER_ADMIN']} />}>
+                <Route path="/roles" element={<GestionRoles />} />
+              </Route>
+
+              {/* ── Fallback ──────────────────────────────────── */}
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </main>
+        </BrowserRouter>
+      </ToastProvider>
     </AuthProvider>
   );
 }
