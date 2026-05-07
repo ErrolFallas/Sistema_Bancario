@@ -1,138 +1,117 @@
-import { useState, useContext } from 'react';
+import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { AuthContext } from '../context/AuthContext';
-import '../css/navbar.css';
+import { useAuth } from '../context/AuthContext';
+
+// Components
+import NavDropdown from './layout/NavDropdown';
+import UserMenu from './layout/UserMenu';
+import MobileSidebar from './layout/MobileSidebar';
+
+// Styles
+import '../css/navbar-enterprise.css';
 
 const Navbar = () => {
-  const { user, logout } = useContext(AuthContext);
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const [menuOpen, setMenuOpen] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   const handleLogout = async () => {
     await logout();
     navigate('/login');
   };
 
-  const closeMenu = () => setMenuOpen(false);
+  // ── Configuración de Menús (Arquitectura Enterprise) ───────────
+  
+  const menuGroups = [
+    {
+      title: 'Operaciones',
+      items: [
+        { label: 'Clientes', path: '/clientes', icon: '👥', description: 'Gestión de perfiles de clientes' },
+        { label: 'Cuentas', path: '/cuentas', icon: '💰', description: 'Control de productos financieros' },
+        { label: 'Tarjetas', path: '/tarjetas', icon: '💳', description: 'Emisión y administración de tarjetas' },
+        { label: 'Préstamos', path: '/prestamos', icon: '🏠', description: 'Créditos y financiamiento' },
+        { label: 'Transacciones', path: '/transacciones', icon: '🔄', description: 'Historial de movimientos' },
+      ]
+    },
+    {
+      title: 'Administración',
+      items: [
+        { label: 'Usuarios', path: '/usuarios', icon: '👤', description: 'Gestión de personal del sistema' },
+        { label: 'Roles', path: '/roles', icon: '🔑', description: 'Control de acceso jerárquico' },
+        { label: 'Bancos', path: '/bancos', icon: '🏢', description: 'Configuración de entidades' },
+      ]
+    },
+    {
+      title: 'Seguridad',
+      items: [
+        { label: 'Auditoría', path: '/auditoria', icon: '📋', description: 'Logs de eventos del sistema' },
+        { label: 'Sesiones', path: '/sesiones', icon: '⏱️', description: 'Control de actividad activa' },
+      ]
+    }
+  ];
 
-  // Jerarquía de visualización
-  const isAdmin = user?.rol === 'ADMIN';
-  const isSuperAdmin = user?.rol === 'SUPER_ADMIN';
-  const isGerente = user?.rol === 'GERENTE';
-  const isEmpleado = user?.rol === 'EMPLEADO';
-  const isCliente = user?.rol === 'CLIENTE';
+  // Filtros de Rol (RBAC)
+  const isAdmin = user?.rol === 'ADMIN' || user?.rol === 'SUPER_ADMIN';
+  const isManagement = isAdmin || user?.rol === 'GERENTE';
 
-  const isStaff = isAdmin || isSuperAdmin || isGerente || isEmpleado;
-  const isManagement = isAdmin || isSuperAdmin || isGerente;
+  // Solo mostrar grupos según permisos
+  const filteredGroups = menuGroups.filter(group => {
+    if (group.title === 'Administración' || group.title === 'Seguridad') {
+      return isManagement;
+    }
+    return true; // Operaciones visible para staff
+  });
 
   return (
-    <nav className="navbar">
-      <div className="navbar-container">
-        {/* ── Brand ──────────────────────────── */}
-        <div className="navbar-brand">
-          <Link to="/" onClick={closeMenu}>
-            <span className="brand-icon">🏦</span>
-            <span className="brand-text">Sistema Bancario</span>
+    <header className="navbar-enterprise">
+      <div className="nav-container">
+        
+        {/* ── SECCIÓN IZQUIERDA: Logo ────────────────── */}
+        <div className="brand-section">
+          <Link to="/">
+            <span className="brand-logo">🏦</span>
+            <span className="brand-name">Nexen <span className="desktop-only">Bank</span></span>
           </Link>
         </div>
 
-        {/* ── Mobile Toggle ──────────────────── */}
-        <div className="navbar-toggle" onClick={() => setMenuOpen(!menuOpen)}>
-          {menuOpen ? '✕' : '☰'}
-        </div>
+        {/* ── SECCIÓN CENTRAL: Navegación ─────────────── */}
+        <nav className="main-nav">
+          <Link to="/" className="nav-home-link">Dashboard</Link>
+          
+          {user && filteredGroups.map((group, index) => (
+            <NavDropdown 
+              key={index} 
+              title={group.title} 
+              items={group.items} 
+            />
+          ))}
+        </nav>
 
-        {/* ── Navigation Menu ────────────────── */}
-        <div className={`navbar-menu ${menuOpen ? 'active' : ''}`}>
+        {/* ── SECCIÓN DERECHA: Usuario ────────────────── */}
+        <div className="user-section">
           {user ? (
-            <>
-              {/* GRUPO 1: OPERACIONES */}
-              <div className="nav-group">
-                <div className="nav-trigger">
-                  <span>Operaciones</span> <i>▼</i>
-                </div>
-                <div className="nav-dropdown">
-                  {isStaff && (
-                    <>
-                      <Link to="/clientes" className="dropdown-item" onClick={closeMenu}>
-                        <span className="dropdown-icon">👥</span> Clientes
-                      </Link>
-                      <Link to="/cuentas" className="dropdown-item" onClick={closeMenu}>
-                        <span className="dropdown-icon">💰</span> Cuentas
-                      </Link>
-                      <Link to="/tarjetas" className="dropdown-item" onClick={closeMenu}>
-                        <span className="dropdown-icon">💳</span> Tarjetas
-                      </Link>
-                    </>
-                  )}
-                  {isManagement && (
-                    <>
-                      <Link to="/prestamos" className="dropdown-item" onClick={closeMenu}>
-                        <span className="dropdown-icon">🏠</span> Préstamos
-                      </Link>
-                      <Link to="/transacciones" className="dropdown-item" onClick={closeMenu}>
-                        <span className="dropdown-icon">🔄</span> Transacciones
-                      </Link>
-                    </>
-                  )}
-                  {isCliente && (
-                    <>
-                      <Link to="/mis-cuentas" className="dropdown-item" onClick={closeMenu}>
-                        <span className="dropdown-icon">💳</span> Mis Cuentas
-                      </Link>
-                      <Link to="/mis-transacciones" className="dropdown-item" onClick={closeMenu}>
-                        <span className="dropdown-icon">🔄</span> Movimientos
-                      </Link>
-                    </>
-                  )}
-                </div>
-              </div>
-
-              {/* GRUPO 2: ADMINISTRACIÓN */}
-              {isManagement && (
-                <div className="nav-group">
-                  <div className="nav-trigger">
-                    <span>Administración</span> <i>▼</i>
-                  </div>
-                  <div className="nav-dropdown">
-                    <Link to="/usuarios" className="dropdown-item" onClick={closeMenu}>
-                      <span className="dropdown-icon">👤</span> Usuarios
-                    </Link>
-                    <Link to="/bancos" className="dropdown-item" onClick={closeMenu}>
-                      <span className="dropdown-icon">🏢</span> Bancos
-                    </Link>
-                    <Link to="/auditoria" className="dropdown-item" onClick={closeMenu}>
-                      <span className="dropdown-icon">📋</span> Auditoría
-                    </Link>
-                    {isSuperAdmin && (
-                      <Link to="/roles" className="dropdown-item" onClick={closeMenu}>
-                        <span className="dropdown-icon">🔑</span> Roles
-                      </Link>
-                    )}
-                  </div>
-                </div>
-              )}
-            </>
+            <UserMenu user={user} onLogout={handleLogout} />
           ) : (
-            <Link to="/login" className="nav-item" onClick={closeMenu}>Iniciar Sesión</Link>
+            <Link to="/login" className="login-link-btn">Iniciar Sesión</Link>
           )}
+
+          {/* Hamburguesa Mobile */}
+          <button className="mobile-toggle" onClick={() => setMobileOpen(true)}>
+            ☰
+          </button>
         </div>
 
-        {/* ── User Profile & Logout ──────────── */}
-        {user && (
-          <div className="navbar-user">
-            <div className="user-badge">
-              <div className="user-info">
-                <span className="user-name">{user.username}</span>
-                <span className="user-role">{user.rol}</span>
-              </div>
-            </div>
-            <button onClick={handleLogout} className="btn-logout-enterprise" title="Cerrar Sesión">
-              <span>Salir</span> 🚪
-            </button>
-          </div>
-        )}
       </div>
-    </nav>
+
+      {/* ── Mobile Sidebar ─────────────────────────── */}
+      <MobileSidebar 
+        isOpen={mobileOpen} 
+        onClose={() => setMobileOpen(false)} 
+        menuGroups={filteredGroups}
+        user={user}
+        onLogout={handleLogout}
+      />
+    </header>
   );
 };
 
