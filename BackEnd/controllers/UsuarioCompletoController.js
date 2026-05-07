@@ -36,6 +36,12 @@ const crearUsuarioCompleto = async (req, res) => {
       empleadoNombre, empleadoApellido, empleadoTelefono, empleadoIdBanco,
     } = req.body;
 
+    console.log('[UsuarioCompletoController] Datos recibidos:', {
+      username, idRol,
+      esCliente: !!clienteNombre,
+      esEmpleado: !!empleadoNombre
+    });
+
     // ── VALIDACIONES BASE ──────────────────────────────────────────
     if (!username || !password || !idRol) {
       await t.rollback();
@@ -96,16 +102,18 @@ const crearUsuarioCompleto = async (req, res) => {
 
       idCliente = cliente.idCliente;
 
+      idCliente = cliente.idCliente;
+
       // Auditoría: creación de cliente
-      const descCliente = await descripcionCrearCliente(req.user, cliente);
+      const descCliente = await descripcionCrearCliente(req.user, cliente, t);
       await registrarAuditoria({
-        idUsuario: req.user.idUsuario,
+        idUsuario: req.user?.idUsuario || null,
         accion: 'CREATE',
         tablaAfectada: 'CLIENTES',
         idRegistro: cliente.idCliente,
         descripcion: descCliente,
         ip: req.ip,
-      });
+      }, t);
     }
 
     // ── CASO 2: ROL EMPLEADO o GERENTE → Crear Empleado primero ────
@@ -132,15 +140,15 @@ const crearUsuarioCompleto = async (req, res) => {
       idEmpleado = empleado.idEmpleado;
 
       // Auditoría: creación de empleado
-      const descEmpleado = await descripcionCrearEmpleado(req.user, empleado);
+      const descEmpleado = await descripcionCrearEmpleado(req.user, empleado, t);
       await registrarAuditoria({
-        idUsuario: req.user.idUsuario,
+        idUsuario: req.user?.idUsuario || null,
         accion: 'CREATE',
         tablaAfectada: 'EMPLEADOS',
         idRegistro: empleado.idEmpleado,
         descripcion: descEmpleado,
         ip: req.ip,
-      });
+      }, t);
     }
 
     // ── CASO 3: ADMIN / SUPER_ADMIN → Sin entidad asociada ─────────
@@ -160,15 +168,15 @@ const crearUsuarioCompleto = async (req, res) => {
     }, { transaction: t });
 
     // Auditoría: creación de usuario
-    const descUsuario = await descripcionCrearUsuario(req.user, usuario, nombreRol);
+    const descUsuario = await descripcionCrearUsuario(req.user, usuario, nombreRol, t);
     await registrarAuditoria({
-      idUsuario: req.user.idUsuario,
+      idUsuario: req.user?.idUsuario || null,
       accion: 'CREATE',
       tablaAfectada: 'USUARIOS',
       idRegistro: usuario.idUsuario,
       descripcion: descUsuario,
       ip: req.ip,
-    });
+    }, t);
 
     // ── COMMIT ─────────────────────────────────────────────────────
     await t.commit();
@@ -185,6 +193,8 @@ const crearUsuarioCompleto = async (req, res) => {
   } catch (error) {
     // ── ROLLBACK ───────────────────────────────────────────────────
     await t.rollback();
+    console.error('[UsuarioCompletoController] Error:', error);
+
     if (error.name === 'SequelizeUniqueConstraintError') {
       return res.status(400).json({ error: 'Error de unicidad: El nombre de usuario o correo electrónico ya se encuentra registrado.' });
     }

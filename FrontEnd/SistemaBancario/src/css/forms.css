@@ -22,7 +22,7 @@
   box-shadow: var(--glass-shadow);
   padding: 2.5rem;
   position: relative;
-  overflow: hidden;
+  overflow: visible; /* Permitir que los dropdowns salgan del contenedor */
 }
 
 /* ── Form Header ───────────────────────────── */

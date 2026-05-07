@@ -5,6 +5,7 @@ import { useToastContext } from '../context/ToastContext';
 import usuarioService from '../services/usuarioService';
 import rolService from '../services/rolService';
 import bancoService from '../services/bancoService';
+import CustomSelect from '../components/ui/CustomSelect';
 import { canModify } from '../helpers/roleHelpers';
 import '../css/forms.css';
 import '../css/dashboard.css';
@@ -240,20 +241,19 @@ const CrearUsuario = () => {
 
             <div className="form-grid">
               <div className="form-group">
-                <label htmlFor="idRol">Rol del Sistema *</label>
-                <select
-                  id="idRol" name="idRol"
-                  value={formData.idRol} onChange={handleChange}
+                <CustomSelect
+                  label="Rol del Sistema"
+                  name="idRol"
+                  value={formData.idRol}
+                  onChange={handleChange}
+                  options={rolesDisponibles.map(rol => ({
+                    value: rol.idRol,
+                    label: `${rol.nombre}${rol.descripcion ? ` — ${rol.descripcion}` : ''}`
+                  }))}
+                  placeholder="Seleccionar Rol"
                   disabled={isLoading}
                   required
-                >
-                  <option value="">Seleccionar Rol</option>
-                  {rolesDisponibles.map(rol => (
-                    <option key={rol.idRol} value={rol.idRol}>
-                      {rol.nombre}
-                    </option>
-                  ))}
-                </select>
+                />
               </div>
               <div className="form-group">
                 <label htmlFor="usuarioEmail">Email de Usuario</label>
@@ -356,19 +356,19 @@ const CrearUsuario = () => {
                   />
                 </div>
                 <div className="form-group">
-                  <label htmlFor="empleadoIdBanco">Banco Asignado *</label>
-                  <select
-                    id="empleadoIdBanco" name="empleadoIdBanco"
-                    value={formData.empleadoIdBanco} onChange={handleChange}
+                  <CustomSelect
+                    label="Banco Asignado"
+                    name="empleadoIdBanco"
+                    value={formData.empleadoIdBanco}
+                    onChange={handleChange}
+                    options={bancos.map(banco => ({
+                      value: banco.idBanco,
+                      label: banco.nombre
+                    }))}
+                    placeholder="Seleccionar Banco"
                     disabled={isLoading}
-                  >
-                    <option value="">Seleccionar Banco</option>
-                    {bancos.map(banco => (
-                      <option key={banco.idBanco} value={banco.idBanco}>
-                        {banco.nombre}
-                      </option>
-                    ))}
-                  </select>
+                    required
+                  />
                 </div>
               </div>
             </section>
