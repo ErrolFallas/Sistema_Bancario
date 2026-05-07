@@ -15,6 +15,7 @@
 const bcrypt = require('bcrypt');
 const { sequelize, Usuario, Rol, Cliente, Empleado, Banco } = require('../models');
 const { registrarAuditoria, descripcionCrearUsuario, descripcionCrearCliente, descripcionCrearEmpleado } = require('../utils/auditoria');
+const { puedeModificar } = require('../utils/jerarquia');
 
 const SALT_ROUNDS = 10;
 
@@ -41,19 +42,22 @@ const crearUsuarioCompleto = async (req, res) => {
       return res.status(400).json({ error: 'Error de validación: Los campos username, password e idRol son obligatorios.' });
     }
 
+    const usernameNormalizado = username.trim().toLowerCase();
     // Verificar si el username ya existe
-    const existeUsername = await Usuario.findOne({ where: { username }, transaction: t });
+    const existeUsername = await Usuario.findOne({ where: { username: usernameNormalizado }, transaction: t });
     if (existeUsername) {
       await t.rollback();
-      return res.status(400).json({ error: 'El nombre de usuario ya está en uso. Por favor elija otro.' });
+      return res.status(400).json({ error: 'El nombre de usuario ya se encuentra registrado.' });
     }
 
     // Verificar si el email de usuario ya existe
+    let emailNormalizado = null;
     if (usuarioEmail) {
-      const existeEmail = await Usuario.findOne({ where: { email: usuarioEmail }, transaction: t });
+      emailNormalizado = usuarioEmail.trim().toLowerCase();
+      const existeEmail = await Usuario.findOne({ where: { email: emailNormalizado }, transaction: t });
       if (existeEmail) {
         await t.rollback();
-        return res.status(400).json({ error: 'El email del usuario ya está registrado en el sistema.' });
+        return res.status(400).json({ error: 'El correo electrónico ya se encuentra registrado.' });
       }
     }
 
@@ -67,13 +71,9 @@ const crearUsuarioCompleto = async (req, res) => {
     const nombreRol = rol.nombre.toUpperCase();
 
     // ── VALIDACIÓN DE JERARQUÍA ────────────────────────────────────
-    if (nombreRol === 'SUPER_ADMIN' && req.user.rol !== 'SUPER_ADMIN') {
+    if (req.user && !puedeModificar(req.user.rol, nombreRol)) {
       await t.rollback();
-      return res.status(403).json({ error: 'Solo un SUPER_ADMIN puede crear otro SUPER_ADMIN.' });
-    }
-    if (nombreRol === 'SUPER_ADMIN' && req.user.rol === 'ADMIN') {
-      await t.rollback();
-      return res.status(403).json({ error: 'Un ADMIN no puede crear usuarios con privilegios de SUPER_ADMIN.' });
+      return res.status(403).json({ error: `Operación denegada por jerarquía: Su rol (${req.user.rol}) no tiene permisos para crear usuarios con rol (${nombreRol}).` });
     }
 
     let idCliente = null;
@@ -150,9 +150,9 @@ const crearUsuarioCompleto = async (req, res) => {
     const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
 
     const usuario = await Usuario.create({
-      username,
+      username: usernameNormalizado,
       passwordHash,
-      email: usuarioEmail || null,
+      email: emailNormalizado,
       cuentaActiva: true,
       idRol,
       idCliente,
@@ -185,6 +185,9 @@ const crearUsuarioCompleto = async (req, res) => {
   } catch (error) {
     // ── ROLLBACK ───────────────────────────────────────────────────
     await t.rollback();
+    if (error.name === 'SequelizeUniqueConstraintError') {
+      return res.status(400).json({ error: 'Error de unicidad: El nombre de usuario o correo electrónico ya se encuentra registrado.' });
+    }
     return res.status(500).json({
       error: 'Error interno del servidor al crear usuario completo.',
       detalle: error.message,

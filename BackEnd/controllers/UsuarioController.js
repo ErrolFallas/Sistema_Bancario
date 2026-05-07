@@ -13,6 +13,7 @@
 const bcrypt = require('bcrypt');
 const { Usuario, Rol, Cliente, Empleado } = require('../models');
 const { registrarAuditoria, descripcionCrearUsuario } = require('../utils/auditoria');
+const { puedeModificar } = require('../utils/jerarquia');
 
 const SALT_ROUNDS = 10;
 
@@ -96,6 +97,18 @@ const crearUsuario = async (req, res) => {
       return res.status(400).json({ error: 'Error de validación: El campo idRol es obligatorio para crear un usuario.' });
     }
 
+    if (resto.username) {
+      resto.username = resto.username.trim().toLowerCase();
+      const existeUsername = await Usuario.findOne({ where: { username: resto.username } });
+      if (existeUsername) return res.status(400).json({ error: 'El nombre de usuario ya se encuentra registrado.' });
+    }
+
+    if (resto.email) {
+      resto.email = resto.email.trim().toLowerCase();
+      const existeEmail = await Usuario.findOne({ where: { email: resto.email } });
+      if (existeEmail) return res.status(400).json({ error: 'El correo electrónico ya se encuentra registrado.' });
+    }
+
     // --- VALIDACIÓN POR ROL ---
     const validacion = await validarReglasRol(resto.idRol, resto.idCliente, resto.idEmpleado);
     if (!validacion.valido) {
@@ -110,11 +123,9 @@ const crearUsuario = async (req, res) => {
     }
 
     // --- LOGICA DE JERARQUÍA DE ROLES ---
-    if (req.user && req.user.rol === 'ADMIN') {
-      const rolSolicitado = await Rol.findByPk(resto.idRol);
-      if (rolSolicitado && rolSolicitado.nombre === 'SUPER_ADMIN') {
-        return res.status(403).json({ error: 'Operación denegada: Un ADMIN no puede crear usuarios con privilegios de SUPER_ADMIN.' });
-      }
+    const rolSolicitado = await Rol.findByPk(resto.idRol);
+    if (rolSolicitado && !puedeModificar(req.user.rol, rolSolicitado.nombre)) {
+      return res.status(403).json({ error: `Operación denegada por jerarquía: Su rol (${req.user.rol}) no tiene permisos para crear usuarios con rol (${rolSolicitado.nombre}).` });
     }
     // -------------------------------------
 
@@ -137,6 +148,9 @@ const crearUsuario = async (req, res) => {
     const { passwordHash: _, ...usuarioPublico } = usuario.toJSON();
     return res.status(201).json(usuarioPublico);
   } catch (error) {
+    if (error.name === 'SequelizeUniqueConstraintError') {
+      return res.status(400).json({ error: 'Error de unicidad: El nombre de usuario o correo electrónico ya se encuentra registrado.' });
+    }
     return res.status(400).json({ error: 'Error de validación en los datos enviados.', detalle: error.message });
   }
 };
@@ -146,14 +160,21 @@ const crearUsuario = async (req, res) => {
 // ============================================
 const buscarUsuarios = async (req, res) => {
   try {
-    const usuarios = await Usuario.findAll({
+    const options = {
       attributes: { exclude: ['passwordHash'] },
       include: [
         { model: Rol,      as: 'rol'      },
         { model: Cliente,  as: 'cliente'  },
         { model: Empleado, as: 'empleado' },
       ],
-    });
+      where: {}
+    };
+
+    if (!(req.query.includeInactive === 'true' && req.user && ['SUPER_ADMIN', 'ADMIN'].includes(req.user.rol))) {
+      options.where.cuentaActiva = true;
+    }
+
+    const usuarios = await Usuario.findAll(options);
     return res.status(200).json(usuarios);
   } catch (error) {
     return res.status(500).json({ error: 'Error interno del servidor al procesar la solicitud.', detalle: error.message });
@@ -197,6 +218,22 @@ const actualizarUsuario = async (req, res) => {
     const nuevoIdCliente = req.body.hasOwnProperty('idCliente') ? req.body.idCliente : usuario.idCliente;
     const nuevoIdEmpleado = req.body.hasOwnProperty('idEmpleado') ? req.body.idEmpleado : usuario.idEmpleado;
 
+    if (req.body.username) {
+      req.body.username = req.body.username.trim().toLowerCase();
+      const existeUsername = await Usuario.findOne({ where: { username: req.body.username } });
+      if (existeUsername && existeUsername.idUsuario !== usuario.idUsuario) {
+        return res.status(400).json({ error: 'El nombre de usuario ya se encuentra registrado.' });
+      }
+    }
+
+    if (req.body.email) {
+      req.body.email = req.body.email.trim().toLowerCase();
+      const existeEmail = await Usuario.findOne({ where: { email: req.body.email } });
+      if (existeEmail && existeEmail.idUsuario !== usuario.idUsuario) {
+        return res.status(400).json({ error: 'El correo electrónico ya se encuentra registrado.' });
+      }
+    }
+
     // Validar reglas por rol (solo si se está cambiando rol o relaciones)
     if (req.body.idRol || req.body.hasOwnProperty('idCliente') || req.body.hasOwnProperty('idEmpleado')) {
       const validacion = await validarReglasRol(nuevoIdRol, nuevoIdCliente, nuevoIdEmpleado);
@@ -206,17 +243,17 @@ const actualizarUsuario = async (req, res) => {
     }
 
     // --- LOGICA DE JERARQUÍA DE ROLES ---
+    const rolActual = await Rol.findByPk(usuario.idRol);
+    const nombreRolAfectado = rolActual ? rolActual.nombre : 'CLIENTE';
+
+    if (req.user && !puedeModificar(req.user.rol, nombreRolAfectado)) {
+      return res.status(403).json({ error: `Operación denegada por jerarquía: Su rol (${req.user.rol}) no tiene permisos para modificar a un usuario con rol (${nombreRolAfectado}).` });
+    }
+
     if (req.body.idRol) {
       const rolSolicitado = await Rol.findByPk(req.body.idRol);
-      const rolActual = await Rol.findByPk(usuario.idRol);
-
-      if (req.user && req.user.rol === 'ADMIN') {
-        if (rolActual && rolActual.nombre === 'SUPER_ADMIN') {
-          return res.status(403).json({ error: 'Operación denegada: Un ADMIN no puede modificar a un SUPER_ADMIN.' });
-        }
-        if (rolSolicitado && rolSolicitado.nombre === 'SUPER_ADMIN') {
-          return res.status(403).json({ error: 'Operación denegada: Un ADMIN no puede promover a un usuario a SUPER_ADMIN.' });
-        }
+      if (rolSolicitado && req.user && !puedeModificar(req.user.rol, rolSolicitado.nombre)) {
+        return res.status(403).json({ error: `Operación denegada por jerarquía: Su rol (${req.user.rol}) no tiene permisos para promover a un usuario al rol (${rolSolicitado.nombre}).` });
       }
     }
     // -------------------------------------
@@ -232,6 +269,9 @@ const actualizarUsuario = async (req, res) => {
     const { passwordHash: _, ...actualizado } = usuario.toJSON();
     return res.status(200).json(actualizado);
   } catch (error) {
+    if (error.name === 'SequelizeUniqueConstraintError') {
+      return res.status(400).json({ error: 'Error de unicidad: El nombre de usuario o correo electrónico ya se encuentra registrado.' });
+    }
     return res.status(400).json({ error: 'Error de validación en los datos enviados.', detalle: error.message });
   }
 };
@@ -246,6 +286,15 @@ const eliminarUsuario = async (req, res) => {
     if (!usuario) {
       return res.status(404).json({ error: `Error de eliminación: No se puede eliminar. No se encontró el usuario con ID '${req.params.id}'.` });
     }
+
+    // --- LOGICA DE JERARQUÍA DE ROLES ---
+    const rolActual = await Rol.findByPk(usuario.idRol);
+    const nombreRolAfectado = rolActual ? rolActual.nombre : 'CLIENTE';
+
+    if (req.user && !puedeModificar(req.user.rol, nombreRolAfectado)) {
+      return res.status(403).json({ error: `Operación denegada por jerarquía: Su rol (${req.user.rol}) no tiene permisos para eliminar a un usuario con rol (${nombreRolAfectado}).` });
+    }
+    // -------------------------------------
     await usuario.destroy();
     return res.status(200).json({ mensaje: 'Usuario eliminado correctamente.' });
   } catch (error) {
@@ -282,6 +331,80 @@ const desactivarCuenta = async (req, res) => {
   }
 };
 
+const desactivarUsuario = async (req, res) => {
+  try {
+    const usuario = await Usuario.findByPk(req.params.id);
+    if (!usuario) {
+      return res.status(404).json({ error: 'Usuario no encontrado.' });
+    }
+
+    const rolActual = await Rol.findByPk(usuario.idRol);
+    const nombreRolAfectado = rolActual ? rolActual.nombre : 'CLIENTE';
+
+    if (req.user && !puedeModificar(req.user.rol, nombreRolAfectado)) {
+      return res.status(403).json({ error: `Operación denegada por jerarquía: Su rol (${req.user.rol}) no tiene permisos para desactivar a un usuario con rol (${nombreRolAfectado}).` });
+    }
+
+    if (usuario.cuentaActiva === false) {
+      return res.status(400).json({ error: 'Operación redundante: El usuario ya se encuentra desactivado.' });
+    }
+
+    await usuario.update({ cuentaActiva: false, usuarioLogeado: false });
+
+    if (req.user) {
+      await registrarAuditoria({
+        idUsuario: req.user.idUsuario,
+        accion: 'DESACTIVAR_USUARIO',
+        tablaAfectada: 'USUARIOS',
+        idRegistro: usuario.idUsuario,
+        descripcion: `Se desactivó el usuario ${usuario.username}`,
+        ip: req.ip,
+      });
+    }
+
+    return res.status(200).json({ mensaje: 'Usuario desactivado correctamente.' });
+  } catch (error) {
+    return res.status(500).json({ error: 'Error interno.', detalle: error.message });
+  }
+};
+
+const reactivarUsuario = async (req, res) => {
+  try {
+    const usuario = await Usuario.findByPk(req.params.id);
+    if (!usuario) {
+      return res.status(404).json({ error: 'Usuario no encontrado.' });
+    }
+
+    const rolActual = await Rol.findByPk(usuario.idRol);
+    const nombreRolAfectado = rolActual ? rolActual.nombre : 'CLIENTE';
+
+    if (req.user && !puedeModificar(req.user.rol, nombreRolAfectado)) {
+      return res.status(403).json({ error: `Operación denegada por jerarquía: Su rol (${req.user.rol}) no tiene permisos para reactivar a un usuario con rol (${nombreRolAfectado}).` });
+    }
+
+    if (usuario.cuentaActiva === true) {
+      return res.status(400).json({ error: 'Operación redundante: El usuario ya se encuentra activo.' });
+    }
+
+    await usuario.update({ cuentaActiva: true });
+
+    if (req.user) {
+      await registrarAuditoria({
+        idUsuario: req.user.idUsuario,
+        accion: 'REACTIVAR_USUARIO',
+        tablaAfectada: 'USUARIOS',
+        idRegistro: usuario.idUsuario,
+        descripcion: `Se reactivó el usuario ${usuario.username}`,
+        ip: req.ip,
+      });
+    }
+
+    return res.status(200).json({ mensaje: 'Usuario reactivado correctamente.' });
+  } catch (error) {
+    return res.status(500).json({ error: 'Error interno.', detalle: error.message });
+  }
+};
+
 module.exports = {
   crearUsuario,
   buscarUsuarios,
@@ -289,4 +412,6 @@ module.exports = {
   actualizarUsuario,
   eliminarUsuario,
   desactivarCuenta,
+  desactivarUsuario,
+  reactivarUsuario,
 };

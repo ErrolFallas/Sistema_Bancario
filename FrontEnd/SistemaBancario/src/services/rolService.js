@@ -29,6 +29,16 @@ const rolService = {
     const response = await api.delete(`/roles/${id}`);
     return response.data;
   },
+
+  desactivar: async (id) => {
+    const response = await api.patch(`/roles/${id}/desactivar`);
+    return response.data;
+  },
+
+  reactivar: async (id) => {
+    const response = await api.patch(`/roles/${id}/reactivar`);
+    return response.data;
+  },
 };
 
 export default rolService;

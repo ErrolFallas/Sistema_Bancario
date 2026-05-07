@@ -4,6 +4,7 @@
 // ============================================
 
 const { Prestamo, Cliente, Banco, EstadoPrestamo } = require("../models");
+const { registrarAuditoria } = require('../utils/auditoria');
 
 const crearPrestamo = async (req, res) => {
   try {
@@ -24,6 +25,11 @@ const buscarPrestamos = async (req, res) => {
         { model: EstadoPrestamo, as: "estadoPrestamo" },
       ],
     };
+
+    if (!(req.query.includeInactive === 'true' && req.user && ['SUPER_ADMIN', 'ADMIN'].includes(req.user.rol))) {
+      opciones.where.isActive = true;
+    }
+
     const prestamos = await Prestamo.findAll(opciones);
     return res.status(200).json(prestamos);
   } catch (error) {
@@ -75,10 +81,68 @@ const eliminarPrestamo = async (req, res) => {
   }
 };
 
+const desactivarPrestamo = async (req, res) => {
+  try {
+    const prestamo = await Prestamo.findByPk(req.params.id);
+    if (!prestamo) return res.status(404).json({ error: 'Préstamo no encontrado.' });
+
+    if (prestamo.isActive === false) {
+      return res.status(400).json({ error: 'Operación redundante: El préstamo ya se encuentra desactivado.' });
+    }
+
+    await prestamo.update({ isActive: false });
+
+    if (req.user) {
+      await registrarAuditoria({
+        idUsuario: req.user.idUsuario,
+        accion: 'DESACTIVAR_PRESTAMO',
+        tablaAfectada: 'PRESTAMOS',
+        idRegistro: prestamo.idPrestamo,
+        descripcion: `Se desactivó el préstamo con ID ${prestamo.idPrestamo}`,
+        ip: req.ip,
+      });
+    }
+
+    return res.status(200).json({ mensaje: 'Préstamo desactivado correctamente.' });
+  } catch (error) {
+    return res.status(500).json({ error: 'Error interno.', detalle: error.message });
+  }
+};
+
+const reactivarPrestamo = async (req, res) => {
+  try {
+    const prestamo = await Prestamo.findByPk(req.params.id);
+    if (!prestamo) return res.status(404).json({ error: 'Préstamo no encontrado.' });
+
+    if (prestamo.isActive === true) {
+      return res.status(400).json({ error: 'Operación redundante: El préstamo ya se encuentra activo.' });
+    }
+
+    await prestamo.update({ isActive: true });
+
+    if (req.user) {
+      await registrarAuditoria({
+        idUsuario: req.user.idUsuario,
+        accion: 'REACTIVAR_PRESTAMO',
+        tablaAfectada: 'PRESTAMOS',
+        idRegistro: prestamo.idPrestamo,
+        descripcion: `Se reactivó el préstamo con ID ${prestamo.idPrestamo}`,
+        ip: req.ip,
+      });
+    }
+
+    return res.status(200).json({ mensaje: 'Préstamo reactivado correctamente.' });
+  } catch (error) {
+    return res.status(500).json({ error: 'Error interno.', detalle: error.message });
+  }
+};
+
 module.exports = {
   crearPrestamo,
   buscarPrestamos,
   buscarPrestamoId,
   actualizarPrestamo,
   eliminarPrestamo,
+  desactivarPrestamo,
+  reactivarPrestamo,
 };

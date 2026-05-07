@@ -4,6 +4,7 @@
 // ============================================
 
 const { Tarjeta, Cuenta, TipoTarjeta, MarcaTarjeta, EstadoTarjeta, Cliente } = require("../models");
+const { registrarAuditoria } = require('../utils/auditoria');
 
 const crearTarjeta = async (req, res) => {
   try {
@@ -31,7 +32,13 @@ const buscarTarjetas = async (req, res) => {
         { model: MarcaTarjeta, as: "marcaTarjeta" },
         { model: EstadoTarjeta, as: "estadoTarjeta" },
       ],
+      where: {}
     };
+
+    if (!(req.query.includeInactive === 'true' && req.user && ['SUPER_ADMIN', 'ADMIN'].includes(req.user.rol))) {
+      opciones.where.isActive = true;
+    }
+
     const tarjetas = await Tarjeta.findAll(opciones);
     return res.status(200).json(tarjetas);
   } catch (error) {
@@ -84,10 +91,68 @@ const eliminarTarjeta = async (req, res) => {
   }
 };
 
+const desactivarTarjeta = async (req, res) => {
+  try {
+    const tarjeta = await Tarjeta.findByPk(req.params.id);
+    if (!tarjeta) return res.status(404).json({ error: 'Tarjeta no encontrada.' });
+
+    if (tarjeta.isActive === false) {
+      return res.status(400).json({ error: 'Operación redundante: La tarjeta ya se encuentra desactivada.' });
+    }
+
+    await tarjeta.update({ isActive: false });
+
+    if (req.user) {
+      await registrarAuditoria({
+        idUsuario: req.user.idUsuario,
+        accion: 'DESACTIVAR_TARJETA',
+        tablaAfectada: 'TARJETAS',
+        idRegistro: tarjeta.idTarjeta,
+        descripcion: `Se desactivó la tarjeta con ID ${tarjeta.idTarjeta}`,
+        ip: req.ip,
+      });
+    }
+
+    return res.status(200).json({ mensaje: 'Tarjeta desactivada correctamente.' });
+  } catch (error) {
+    return res.status(500).json({ error: 'Error interno.', detalle: error.message });
+  }
+};
+
+const reactivarTarjeta = async (req, res) => {
+  try {
+    const tarjeta = await Tarjeta.findByPk(req.params.id);
+    if (!tarjeta) return res.status(404).json({ error: 'Tarjeta no encontrada.' });
+
+    if (tarjeta.isActive === true) {
+      return res.status(400).json({ error: 'Operación redundante: La tarjeta ya se encuentra activa.' });
+    }
+
+    await tarjeta.update({ isActive: true });
+
+    if (req.user) {
+      await registrarAuditoria({
+        idUsuario: req.user.idUsuario,
+        accion: 'REACTIVAR_TARJETA',
+        tablaAfectada: 'TARJETAS',
+        idRegistro: tarjeta.idTarjeta,
+        descripcion: `Se reactivó la tarjeta con ID ${tarjeta.idTarjeta}`,
+        ip: req.ip,
+      });
+    }
+
+    return res.status(200).json({ mensaje: 'Tarjeta reactivada correctamente.' });
+  } catch (error) {
+    return res.status(500).json({ error: 'Error interno.', detalle: error.message });
+  }
+};
+
 module.exports = {
   crearTarjeta,
   buscarTarjetas,
   buscarTarjetaId,
   actualizarTarjeta,
   eliminarTarjeta,
+  desactivarTarjeta,
+  reactivarTarjeta,
 };

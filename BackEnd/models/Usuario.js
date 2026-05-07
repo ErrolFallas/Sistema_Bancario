@@ -17,6 +17,11 @@ module.exports = (sequelize) => {
       type: DataTypes.STRING(50),
       allowNull: false,
       unique: true,
+      set(val) {
+        if (val) {
+          this.setDataValue('username', val.trim().toLowerCase());
+        }
+      },
       validate: {
         notEmpty: { msg: 'El nombre de usuario es obligatorio' },
         len: {
@@ -29,6 +34,13 @@ module.exports = (sequelize) => {
       type: DataTypes.STRING(100),
       allowNull: true,
       unique: true,
+      set(val) {
+        if (val) {
+          this.setDataValue('email', val.trim().toLowerCase());
+        } else {
+          this.setDataValue('email', null);
+        }
+      },
       validate: {
         isEmail: { msg: 'El email debe tener un formato válido' },
       },

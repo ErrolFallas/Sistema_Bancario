@@ -45,6 +45,11 @@ const login = async (req, res) => {
       return res.status(403).json({ error: 'Acceso denegado: Su cuenta se encuentra inactiva o ha sido suspendida. Por favor, contacte al administrador del sistema.' });
     }
 
+    // 4. Verificar si el rol está activo
+    if (usuario.rol && !usuario.rol.isActive) {
+      return res.status(403).json({ error: 'Su rol de acceso ha sido desactivado. Contacte al administrador del sistema.' });
+    }
+
     // 4. Comparar contraseña con hash bcrypt
     const esValida = await bcrypt.compare(password, usuario.passwordHash);
     if (!esValida) {
@@ -150,16 +155,32 @@ const me = async (req, res) => {
 // ============================================
 const register = async (req, res) => {
   try {
-    const { username, password, idCliente } = req.body;
+    const { username, password, email, idCliente } = req.body;
 
     if (!username || !password) {
       return res.status(400).json({ error: 'Error de validación: Username y password son obligatorios para registrarse.' });
     }
 
-    // Verificar si el username ya existe
-    const existe = await Usuario.findOne({ where: { username } });
-    if (existe) {
-      return res.status(400).json({ error: 'El nombre de usuario ya está en uso.' });
+    // Normalizar username
+    const usernameNormalizado = username.trim().toLowerCase();
+
+    // Normalizar email si se provee
+    let emailNormalizado = null;
+    if (email) {
+      emailNormalizado = email.trim().toLowerCase();
+    }
+
+    // ── DOBLE VALIDACIÓN (CAPA APLICACIÓN) ──
+    const existeUsername = await Usuario.findOne({ where: { username: usernameNormalizado } });
+    if (existeUsername) {
+      return res.status(400).json({ error: 'El nombre de usuario ya se encuentra registrado.' });
+    }
+
+    if (emailNormalizado) {
+      const existeEmail = await Usuario.findOne({ where: { email: emailNormalizado } });
+      if (existeEmail) {
+        return res.status(400).json({ error: 'El correo electrónico ya se encuentra registrado.' });
+      }
     }
 
     const totalUsuarios = await Usuario.count();
@@ -210,8 +231,9 @@ const register = async (req, res) => {
 
     // Crear usuario (cuenta_activa = true, usuario_logeado = false por defecto)
     const nuevoUsuario = await Usuario.create({
-      username,
+      username: usernameNormalizado,
       passwordHash,
+      email: emailNormalizado,
       cuentaActiva: true,
       idRol: rolAsignado.idRol,
       idCliente: idClienteFinal,
@@ -245,6 +267,14 @@ const register = async (req, res) => {
       rolAsignado: rolAsignado.nombre
     });
   } catch (error) {
+    // ── DOBLE VALIDACIÓN (CAPA BASE DE DATOS) ──
+    if (error.name === 'SequelizeUniqueConstraintError') {
+      const campo = error.errors && error.errors[0] ? error.errors[0].path : '';
+      if (campo === 'email') {
+        return res.status(400).json({ error: 'El correo electrónico ya se encuentra registrado.' });
+      }
+      return res.status(400).json({ error: 'El nombre de usuario ya se encuentra registrado.' });
+    }
     return res.status(500).json({ error: 'Error interno del servidor al registrar usuario.', detalle: error.message });
   }
 };

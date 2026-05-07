@@ -52,6 +52,22 @@ const usuarioService = {
   delete: async (id) => {
     const response = await api.delete(`/usuarios/${id}`);
     return response.data;
+  },
+
+  /**
+   * Desactivar usuario lógicamente (Soft Delete)
+   */
+  desactivar: async (id) => {
+    const response = await api.patch(`/usuarios/${id}/desactivar`);
+    return response.data;
+  },
+
+  /**
+   * Reactivar usuario lógicamente
+   */
+  reactivar: async (id) => {
+    const response = await api.patch(`/usuarios/${id}/reactivar`);
+    return response.data;
   }
 };
 

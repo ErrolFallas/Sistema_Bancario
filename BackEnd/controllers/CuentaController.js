@@ -4,6 +4,7 @@
 // ============================================
 
 const { Cuenta, Banco, TipoCuenta, ClienteCuenta, Cliente } = require("../models");
+const { registrarAuditoria } = require('../utils/auditoria');
 
 // ============================================
 // Función auxiliar: generar número de cuenta automático
@@ -74,7 +75,14 @@ const buscarCuentas = async (req, res) => {
           ...(req.user && req.user.rol === 'CLIENTE' ? { where: { idCliente: req.user.idCliente } } : {})
         },
       ],
+      where: {}
+      where: {}
     };
+
+    if (!(req.query.includeInactive === 'true' && req.user && ['SUPER_ADMIN', 'ADMIN'].includes(req.user.rol))) {
+      opciones.where.isActive = true;
+    }
+
     const cuentas = await Cuenta.findAll(opciones);
     return res.status(200).json(cuentas);
   } catch (error) {
@@ -135,10 +143,68 @@ const eliminarCuenta = async (req, res) => {
   }
 };
 
+const desactivarCuenta = async (req, res) => {
+  try {
+    const cuenta = await Cuenta.findByPk(req.params.id);
+    if (!cuenta) return res.status(404).json({ error: 'Cuenta no encontrada.' });
+
+    if (cuenta.isActive === false) {
+      return res.status(400).json({ error: 'Operación redundante: La cuenta ya se encuentra desactivada.' });
+    }
+
+    await cuenta.update({ isActive: false });
+
+    if (req.user) {
+      await registrarAuditoria({
+        idUsuario: req.user.idUsuario,
+        accion: 'DESACTIVAR_CUENTA',
+        tablaAfectada: 'CUENTAS',
+        idRegistro: cuenta.idCuenta,
+        descripcion: `Se desactivó la cuenta ${cuenta.numeroCuenta}`,
+        ip: req.ip,
+      });
+    }
+
+    return res.status(200).json({ mensaje: 'Cuenta desactivada correctamente.' });
+  } catch (error) {
+    return res.status(500).json({ error: 'Error interno.', detalle: error.message });
+  }
+};
+
+const reactivarCuenta = async (req, res) => {
+  try {
+    const cuenta = await Cuenta.findByPk(req.params.id);
+    if (!cuenta) return res.status(404).json({ error: 'Cuenta no encontrada.' });
+
+    if (cuenta.isActive === true) {
+      return res.status(400).json({ error: 'Operación redundante: La cuenta ya se encuentra activa.' });
+    }
+
+    await cuenta.update({ isActive: true });
+
+    if (req.user) {
+      await registrarAuditoria({
+        idUsuario: req.user.idUsuario,
+        accion: 'REACTIVAR_CUENTA',
+        tablaAfectada: 'CUENTAS',
+        idRegistro: cuenta.idCuenta,
+        descripcion: `Se reactivó la cuenta ${cuenta.numeroCuenta}`,
+        ip: req.ip,
+      });
+    }
+
+    return res.status(200).json({ mensaje: 'Cuenta reactivada correctamente.' });
+  } catch (error) {
+    return res.status(500).json({ error: 'Error interno.', detalle: error.message });
+  }
+};
+
 module.exports = {
   crearCuenta,
   buscarCuentas,
   buscarCuentaId,
   actualizarCuenta,
   eliminarCuenta,
+  desactivarCuenta,
+  reactivarCuenta,
 };

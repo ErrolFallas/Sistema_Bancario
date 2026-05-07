@@ -48,6 +48,15 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     checkAuth();
+
+    // Listener para invalidación automática de sesión
+    const handleSessionExpired = async () => {
+      // Limpiar estado
+      setUser(null);
+    };
+
+    window.addEventListener('session-expired', handleSessionExpired);
+    return () => window.removeEventListener('session-expired', handleSessionExpired);
   }, []);
 
   const login = async (credentials) => {

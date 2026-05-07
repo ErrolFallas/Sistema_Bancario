@@ -16,6 +16,8 @@ const {
   buscarPrestamoId,
   eliminarPrestamo,
   actualizarPrestamo,
+  desactivarPrestamo,
+  reactivarPrestamo,
 } = require("../controllers/PrestamoController");
 
 router.post("/", autenticarToken, verificarRol('CLIENTE', 'EMPLEADO'), crearPrestamo);
@@ -23,5 +25,7 @@ router.get("/", autenticarToken, verificarRol('ADMIN', 'GERENTE', 'CLIENTE'), bu
 router.get("/:id", autenticarToken, verificarRol('ADMIN', 'GERENTE', 'CLIENTE'), verificarPropiedad('Prestamo'), buscarPrestamoId);
 router.delete("/:id", autenticarToken, verificarRol('ADMIN'), verificarPropiedad('Prestamo'), eliminarPrestamo);
 router.patch("/:id", autenticarToken, verificarRol('GERENTE'), verificarPropiedad('Prestamo'), actualizarPrestamo);
+router.patch("/:id/desactivar", autenticarToken, verificarRol('ADMIN', 'GERENTE'), verificarPropiedad('Prestamo'), desactivarPrestamo);
+router.patch("/:id/reactivar", autenticarToken, verificarRol('ADMIN', 'GERENTE'), verificarPropiedad('Prestamo'), reactivarPrestamo);
 
 module.exports = router;

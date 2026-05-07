@@ -28,9 +28,10 @@ api.interceptors.response.use(
     // Extraer mensaje de error del backend o usar uno genérico
     const message = error.response?.data?.error || error.response?.data?.mensaje || 'Error inesperado en el servidor';
     
-    // Si el backend devuelve 401, podríamos forzar un logout en el estado global si fuera necesario
-    if (error.response?.status === 401) {
-      console.warn('Sesión no autorizada o expirada.');
+    // Si el backend devuelve 401 o 403, forzamos logout automático
+    if (error.response?.status === 401 || error.response?.status === 403) {
+      console.warn('Sesión no autorizada, expirada o rol desactivado.');
+      window.dispatchEvent(new Event('session-expired'));
     }
 
     return Promise.reject({

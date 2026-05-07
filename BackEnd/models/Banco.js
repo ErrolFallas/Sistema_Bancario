@@ -36,6 +36,12 @@ module.exports = (sequelize) => {
       type: DataTypes.STRING(20),
       allowNull: true,
     },
+    isActive: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: true,
+      field: 'is_active',
+    },
   }, {
     tableName: 'BANCOS',
     timestamps: true,

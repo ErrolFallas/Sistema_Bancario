@@ -66,6 +66,12 @@ module.exports = (sequelize) => {
         key: 'id_estado_tarjeta',
       },
     },
+    isActive: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: true,
+      field: 'is_active',
+    },
   }, {
     tableName: 'TARJETAS',
     timestamps: true,

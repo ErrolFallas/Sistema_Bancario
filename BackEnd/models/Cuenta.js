@@ -36,6 +36,12 @@ module.exports = (sequelize) => {
       allowNull: false,
       defaultValue: true,
     },
+    isActive: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: true,
+      field: 'is_active',
+    },
     fechaApertura: {
       type: DataTypes.DATEONLY,
       allowNull: true,

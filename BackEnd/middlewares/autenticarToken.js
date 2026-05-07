@@ -4,7 +4,7 @@
 // ============================================
 
 const jwt = require('jsonwebtoken');
-const { Usuario } = require('../models');
+const { Usuario, Rol } = require('../models');
 
 /**
  * Extrae y verifica el Bearer token del header Authorization.
@@ -30,8 +30,10 @@ const autenticarToken = async (req, res, next) => {
     // 1. Verificar y decodificar JWT
     const payload = jwt.verify(token, process.env.JWT_SECRET);
 
-    // 2. Verificar estado real del usuario en BD
-    const usuario = await Usuario.findByPk(payload.idUsuario);
+    // 2. Verificar estado real del usuario en BD e incluir Rol
+    const usuario = await Usuario.findByPk(payload.idUsuario, {
+      include: [{ model: Rol, as: 'rol' }]
+    });
 
     if (!usuario) {
       return res.status(401).json({ error: 'Sesión inválida o expirada. El usuario asociado al token ya no existe en el sistema.' });
@@ -45,6 +47,12 @@ const autenticarToken = async (req, res, next) => {
     // 4. Verificar sesión activa (usuario_logeado)
     if (!usuario.usuarioLogeado) {
       return res.status(401).json({ error: 'Sesión inválida o expirada. Debe iniciar sesión nuevamente con POST /auth/login.' });
+    }
+
+    // 5. Verificar rol activo (Soft Delete Dinámico)
+    if (usuario.rol && !usuario.rol.isActive) {
+      await usuario.update({ usuarioLogeado: false }); // Cortar sesión operativa
+      return res.status(403).json({ error: 'Su rol de acceso ha sido desactivado. Contacte al administrador del sistema.' });
     }
 
     // 5. Adjuntar payload al request

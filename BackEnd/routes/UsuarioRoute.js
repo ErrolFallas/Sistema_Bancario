@@ -14,6 +14,8 @@ const {
   actualizarUsuario,
   eliminarUsuario,
   desactivarCuenta,
+  desactivarUsuario,
+  reactivarUsuario,
 } = require('../controllers/UsuarioController');
 
 const { autenticarToken } = require('../middlewares/autenticarToken');
@@ -39,6 +41,8 @@ router.get('/',     autenticarToken, verificarRol('ADMIN'), buscarUsuarios);
 // ADMIN puede ver y editar cualquier usuario
 router.get('/:id',    autenticarToken, verificarRol('ADMIN'), buscarUsuarioId);
 router.patch('/:id',  autenticarToken, verificarRol('ADMIN'), actualizarUsuario);
+router.patch('/:id/desactivar', autenticarToken, verificarRol('ADMIN'), desactivarUsuario);
+router.patch('/:id/reactivar', autenticarToken, verificarRol('ADMIN'), reactivarUsuario);
 
 // Hard-delete: EXCLUSIVO para ADMIN
 router.delete('/:id', autenticarToken, verificarRol('ADMIN'), eliminarUsuario);
