@@ -29,8 +29,8 @@ const puedeModificar = (rolOrigen, rolDestino) => {
  * Define qué roles puede crear cada nivel de usuario.
  */
 const puedeCrearRol = (rolOrigen, rolACrear) => {
-  const origen = rolOrigen?.toUpperCase();
-  const destino = rolACrear?.toUpperCase();
+  const origen = rolOrigen?.trim()?.toUpperCase();
+  const destino = rolACrear?.trim()?.toUpperCase();
 
   if (origen === 'SUPER_ADMIN') return true; // Puede crear cualquier rol
 

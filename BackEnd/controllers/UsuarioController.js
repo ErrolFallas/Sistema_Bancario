@@ -20,18 +20,28 @@ const SALT_ROUNDS = 10;
 // ============================================
 // Función auxiliar: validar reglas por rol
 // ============================================
-const validarReglasRol = async (idRol, idCliente, idEmpleado) => {
+const validarReglasRol = async (idRol, idCliente, idEmpleado, actorRol = null) => {
   // Obtener el nombre del rol
   const rol = await Rol.findByPk(idRol);
   if (!rol) {
     return { valido: false, status: 400, error: `Error de validación: No existe un rol con el ID '${idRol}'.` };
   }
 
-  const nombreRol = rol.nombre.toUpperCase();
+  const nombreRol = rol.nombre.trim().toUpperCase();
+  const actor = actorRol?.trim()?.toUpperCase();
 
-  // REGLA: Solo un SUPER_ADMIN puede crear otro SUPER_ADMIN
+  // REGLA: Solo un SUPER_ADMIN puede crear o promover a otro SUPER_ADMIN
   if (nombreRol === 'SUPER_ADMIN') {
-    return { valido: false, status: 403, error: 'Operación denegada: No se puede crear o asignar el rol SUPER_ADMIN desde esta ruta. Solo un SUPER_ADMIN puede promover a otro usuario a SUPER_ADMIN.', requiereSuperAdmin: true };
+    if (actor === 'SUPER_ADMIN') {
+      // Permitido: Gobernanza administrativa de alto nivel
+    } else {
+      return { 
+        valido: false, 
+        status: 403, 
+        error: `Operación denegada: No se puede asignar el rol SUPER_ADMIN. Solo un SUPER_ADMIN puede promover a otro usuario a SUPER_ADMIN.`, 
+        requiereSuperAdmin: true 
+      };
+    }
   }
 
   // REGLA: Nunca ambos IDs simultáneamente
@@ -110,16 +120,9 @@ const crearUsuario = async (req, res) => {
     }
 
     // --- VALIDACIÓN POR ROL ---
-    const validacion = await validarReglasRol(resto.idRol, resto.idCliente, resto.idEmpleado);
+    const validacion = await validarReglasRol(resto.idRol, resto.idCliente, resto.idEmpleado, req.user?.rol);
     if (!validacion.valido) {
-      // Si requiere SUPER_ADMIN y el usuario actual ES SUPER_ADMIN, permitir
-      if (validacion.requiereSuperAdmin && req.user && req.user.rol === 'SUPER_ADMIN') {
-        // Permitir: SUPER_ADMIN puede crear otro SUPER_ADMIN
-        validacion.valido = true;
-        validacion.nombreRol = 'SUPER_ADMIN';
-      } else {
-        return res.status(validacion.status).json({ error: validacion.error });
-      }
+      return res.status(validacion.status).json({ error: validacion.error });
     }
 
     // --- LOGICA DE GOBERNANZA: LÍMITE SUPER_ADMIN (MAX 2) ---
@@ -264,16 +267,9 @@ const actualizarUsuario = async (req, res) => {
 
     // Validar reglas por rol (solo si se está cambiando rol o relaciones)
     if (req.body.idRol || req.body.hasOwnProperty('idCliente') || req.body.hasOwnProperty('idEmpleado')) {
-      const validacion = await validarReglasRol(nuevoIdRol, nuevoIdCliente, nuevoIdEmpleado);
-      
+      const validacion = await validarReglasRol(nuevoIdRol, nuevoIdCliente, nuevoIdEmpleado, req.user?.rol);
       if (!validacion.valido) {
-        // PERMITIR PROMOCIÓN SI EL ACTOR ES SUPER_ADMIN (Gobernanza Bancaria)
-        const actorRol = req.user?.rol?.toUpperCase();
-        if (validacion.requiereSuperAdmin && actorRol === 'SUPER_ADMIN') {
-          // Bypass permitido: Super Admin puede otorgar privilegios de Super Admin
-        } else {
-          return res.status(validacion.status).json({ error: validacion.error });
-        }
+        return res.status(validacion.status).json({ error: validacion.error });
       }
     }
 
