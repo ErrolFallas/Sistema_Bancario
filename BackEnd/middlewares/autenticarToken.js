@@ -51,21 +51,32 @@ const autenticarToken = async (req, res, next) => {
 
     // 5. Verificar rol activo (Soft Delete Dinámico)
     if (usuario.rol && !usuario.rol.isActive) {
-      await usuario.update({ usuarioLogeado: false }); // Cortar sesión operativa
+      if (typeof usuario.update === 'function') {
+        await usuario.update({ usuarioLogeado: false }); // Cortar sesión operativa
+      }
       return res.status(403).json({ error: 'Su rol de acceso ha sido desactivado. Contacte al administrador del sistema.' });
     }
 
     // 5. Adjuntar payload al request (Normalizado para consistencia)
     req.user = {
       ...payload,
-      rol: usuario.rol ? usuario.rol.nombre.toUpperCase() : (payload.rol ? payload.rol.toUpperCase() : null)
+      rol: usuario.rol ? usuario.rol.nombre.toUpperCase() : (payload.rol ? payload.rol.toUpperCase() : null),
+      idUsuario: usuario.idUsuario,
+      idCliente: usuario.idCliente,
+      idEmpleado: usuario.idEmpleado
     };
     next();
   } catch (err) {
     if (err.name === 'TokenExpiredError') {
       return res.status(401).json({ error: 'Acceso denegado. Su Token ha expirado, por favor inicie sesión nuevamente.' });
     }
-    return res.status(403).json({ error: 'Acceso denegado por seguridad: El Token proporcionado es inválido o está corrupto.' });
+    if (err.name === 'JsonWebTokenError') {
+      return res.status(403).json({ error: 'Acceso denegado por seguridad: El Token proporcionado es inválido o está corrupto.' });
+    }
+    
+    // Error técnico inesperado (ej: fallo DB)
+    console.error('[autenticarToken] Error interno:', err);
+    return res.status(500).json({ error: 'Error interno del servidor durante la autenticación.' });
   }
 };
 

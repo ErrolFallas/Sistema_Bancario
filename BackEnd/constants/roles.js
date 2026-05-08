@@ -1,0 +1,20 @@
+const ROLES = {
+    SUPER_ADMIN: 'SUPER_ADMIN',
+    ADMIN: 'ADMIN',
+    GERENTE: 'GERENTE',
+    EMPLEADO: 'EMPLEADO',
+    CLIENTE: 'CLIENTE'
+};
+
+const PESOS_ROLES = {
+    [ROLES.SUPER_ADMIN]: 100,
+    [ROLES.ADMIN]: 80,
+    [ROLES.GERENTE]: 60,
+    [ROLES.EMPLEADO]: 40,
+    [ROLES.CLIENTE]: 20
+};
+
+module.exports = {
+    ROLES,
+    PESOS_ROLES
+};

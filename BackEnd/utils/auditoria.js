@@ -1,24 +1,12 @@
 // ============================================
-// Utilidad: registrarAuditoria
+// Utilidad: auditoria.js
 // Helper reutilizable para auditoría automática
-// ============================================
-// USO:
-//   const { registrarAuditoria } = require('../utils/auditoria');
-//   await registrarAuditoria({ idUsuario, accion, tablaAfectada, idRegistro, descripcion, ip });
-//
-// REGLAS:
-//   - NUNCA lanza errores (try/catch interno)
-//   - NO rompe el flujo principal del controller
-//   - Inserta directamente en el modelo HistorialAuditoria
 // ============================================
 
 const { HistorialAuditoria, Empleado, Cliente } = require('../models');
 
 /**
  * Construye una descripción del creador basada en req.user.
- * 
- * @param {Object} reqUser - El objeto req.user
- * @param {Object} [t] - Transacción opcional
  */
 const construirPrefijo = async (reqUser, t = null) => {
   if (!reqUser) return 'El sistema';
@@ -38,10 +26,7 @@ const construirPrefijo = async (reqUser, t = null) => {
 };
 
 /**
- * @param {Object} reqUser 
- * @param {Object} usuario 
- * @param {string} nombreRol 
- * @param {Object} [t] - Transacción opcional
+ * Genera descripción para creación de usuario.
  */
 const descripcionCrearUsuario = async (reqUser, usuario, nombreRol, t = null) => {
   const prefijo = await construirPrefijo(reqUser, t);
@@ -80,8 +65,6 @@ const descripcionCrearEmpleado = async (reqUser, empleado, t = null) => {
 
 /**
  * Registra una acción en HISTORIAL_AUDITORIA.
- * @param {Object} params
- * @param {Object} [t] - Transacción opcional
  */
 const registrarAuditoria = async ({ idUsuario, accion, tablaAfectada, idRegistro, descripcion, ip }, t = null) => {
   try {
@@ -99,8 +82,23 @@ const registrarAuditoria = async ({ idUsuario, accion, tablaAfectada, idRegistro
   }
 };
 
+/**
+ * Simplifica el registro de auditoría extrayendo datos del request de forma automática.
+ */
+const auditRequest = async (req, { accion, tablaAfectada, idRegistro, descripcion }, t = null) => {
+  return await registrarAuditoria({
+    idUsuario: req.user?.idUsuario,
+    accion,
+    tablaAfectada,
+    idRegistro,
+    descripcion,
+    ip: req.ip,
+  }, t);
+};
+
 module.exports = {
   registrarAuditoria,
+  auditRequest,
   descripcionCrearUsuario,
   descripcionCrearCliente,
   descripcionCrearEmpleado,

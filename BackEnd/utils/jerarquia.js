@@ -1,26 +1,14 @@
-// ============================================
-// Utilidad: jerarquia.js
-// Lógica de jerarquía estricta de RBAC y Gobernanza Bancaria
-// SUPER_ADMIN > ADMIN > GERENTE > EMPLEADO > CLIENTE
-// ============================================
-
-const JERARQUIA = {
-  'SUPER_ADMIN': 100,
-  'ADMIN': 80,
-  'GERENTE': 60,
-  'EMPLEADO': 40,
-  'CLIENTE': 20
-};
+const { ROLES, PESOS_ROLES } = require('../constants/roles');
 
 /**
  * REGLA 1: Jerarquía de Modificación
  * Ningún rol puede modificar a un usuario de igual o mayor jerarquía.
  */
 const puedeModificar = (rolOrigen, rolDestino) => {
-  const pesoOrigen = JERARQUIA[rolOrigen] || 0;
-  const pesoDestino = JERARQUIA[rolDestino] || 0;
+  const pesoOrigen = PESOS_ROLES[rolOrigen] || 0;
+  const pesoDestino = PESOS_ROLES[rolDestino] || 0;
 
-  if (rolOrigen === 'SUPER_ADMIN') return true;
+  if (rolOrigen === ROLES.SUPER_ADMIN) return true;
   return pesoOrigen > pesoDestino;
 };
 
@@ -32,43 +20,54 @@ const puedeCrearRol = (rolOrigen, rolACrear) => {
   const origen = rolOrigen?.trim()?.toUpperCase();
   const destino = rolACrear?.trim()?.toUpperCase();
 
-  if (origen === 'SUPER_ADMIN') return true; // Puede crear cualquier rol
+  if (origen === ROLES.SUPER_ADMIN) return true;
 
-  if (origen === 'ADMIN') {
-    // Solo puede crear GERENTE, EMPLEADO, CLIENTE
-    return ['GERENTE', 'EMPLEADO', 'CLIENTE'].includes(destino);
+  if (origen === ROLES.ADMIN) {
+    return [ROLES.GERENTE, ROLES.EMPLEADO, ROLES.CLIENTE].includes(destino);
   }
 
-  if (origen === 'GERENTE') {
-    // Solo puede crear EMPLEADO, CLIENTE
-    return ['EMPLEADO', 'CLIENTE'].includes(destino);
+  if (origen === ROLES.GERENTE) {
+    return [ROLES.EMPLEADO, ROLES.CLIENTE].includes(destino);
   }
 
-  if (origen === 'EMPLEADO') {
-    // Solo puede crear CLIENTE
-    return destino === 'CLIENTE';
+  if (origen === ROLES.EMPLEADO) {
+    return destino === ROLES.CLIENTE;
   }
 
-  return false; // CLIENTE y otros no pueden crear usuarios
+  return false;
 };
 
 /**
  * REGLA 3: Protección de Seniority para SUPER_ADMIN
  * Un SUPER_ADMIN más reciente NO puede desactivar a uno más antiguo.
+ * Soporta tanto strings como objetos de asociación de Sequelize.
  */
 const esMasAntiguo = (usuarioActor, usuarioObjetivo) => {
-  if (usuarioActor.rol !== 'SUPER_ADMIN' || usuarioObjetivo.rol !== 'SUPER_ADMIN') return true;
+  const getRolNombre = (u) => {
+    if (!u) return null;
+    if (typeof u.rol === 'string') return u.rol;
+    if (u.rol && typeof u.rol.nombre === 'string') return u.rol.nombre;
+    return null;
+  };
+
+  const rolActor = getRolNombre(usuarioActor);
+  const rolObjetivo = getRolNombre(usuarioObjetivo);
+
+  // Si alguno no es SUPER_ADMIN, no aplica protección de seniority (aplica jerarquía normal)
+  if (rolActor !== ROLES.SUPER_ADMIN || rolObjetivo !== ROLES.SUPER_ADMIN) return true;
   
   const fechaActor = new Date(usuarioActor.createdAt);
   const fechaObjetivo = new Date(usuarioObjetivo.createdAt);
 
-  // Actor debe ser anterior o igual al objetivo para proceder
+  // Actor debe ser anterior al objetivo para proceder (el más antiguo tiene el poder)
+  // Si son iguales en fecha, se permite por consistencia técnica (raro en producción)
   return fechaActor <= fechaObjetivo;
 };
 
 module.exports = {
-  JERARQUIA,
+  JERARQUIA: PESOS_ROLES,
   puedeModificar,
   puedeCrearRol,
-  esMasAntiguo
+  esMasAntiguo,
+  ROLES
 };

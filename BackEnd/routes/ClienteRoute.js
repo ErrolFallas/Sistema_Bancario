@@ -22,6 +22,6 @@ router.post("/", autenticarToken, verificarRol('ADMIN', 'EMPLEADO', 'GERENTE'), 
 router.get("/", autenticarToken, verificarRol('ADMIN', 'EMPLEADO', 'GERENTE', 'CLIENTE'), buscarClientes);
 router.get("/:id", autenticarToken, verificarRol('ADMIN', 'EMPLEADO', 'GERENTE', 'CLIENTE'), verificarPropiedad('Cliente'), buscarClienteId);
 router.delete("/:id", autenticarToken, verificarRol('ADMIN'), verificarPropiedad('Cliente'), eliminarCliente);
-router.patch("/:id", autenticarToken, verificarRol('ADMIN', 'EMPLEADO'), verificarPropiedad('Cliente'), actualizarCliente);
+router.patch("/:id", autenticarToken, verificarRol('ADMIN', 'EMPLEADO', 'CLIENTE'), verificarPropiedad('Cliente'), actualizarCliente);
 
 module.exports = router;

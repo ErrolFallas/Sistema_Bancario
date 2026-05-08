@@ -89,31 +89,6 @@ app.use("/pagos-prestamo", pagoPrestamoRoute);
 app.use("/historial-auditoria", historialAuditoriaRoute);
 
 // ============================================
-// Iniciar servidor
+// Exportar App para server.js y Tests
 // ============================================
-
-const PORT = process.env.PORT || 3000;
-
-const iniciarServidor = async () => {
-    try {
-        // Verificar conexión a MySQL
-        await db.sequelize.authenticate();
-        console.log("✅  Conexión a la base de datos establecida correctamente.");
-
-        // Sincronizar tablas (no borra datos existentes)
-        await db.sequelize.sync();
-        console.log("✅  Tablas sincronizadas correctamente.");
-
-        // Poblar base de datos con Roles y Permisos base
-        await inicializarDatosBase();
-
-        app.listen(PORT, () => {
-            console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`);
-        });
-    } catch (error) {
-        console.error("❌  Error al iniciar el servidor:", error.message);
-        process.exit(1);
-    }
-};
-
-iniciarServidor();
+module.exports = app;

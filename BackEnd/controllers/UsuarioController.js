@@ -220,7 +220,12 @@ const buscarUsuarios = async (req, res) => {
       where: {}
     };
 
-    if (!(req.query.includeInactive === 'true' && req.user && ['SUPER_ADMIN', 'ADMIN'].includes(req.user.rol))) {
+    // Restricción de visibilidad para CLIENTE
+    if (req.user && req.user.rol === ROLES.CLIENTE) {
+      options.where.idUsuario = req.user.idUsuario;
+    }
+
+    if (!(req.query.includeInactive === 'true' && req.user && [ROLES.SUPER_ADMIN, ROLES.ADMIN].includes(req.user.rol))) {
       options.where.cuentaActiva = true;
     }
 
@@ -236,6 +241,10 @@ const buscarUsuarios = async (req, res) => {
 // ============================================
 const buscarUsuarioId = async (req, res) => {
   try {
+    if (!tieneDerechoAcceso(req.user, req.params.id)) {
+      return res.status(403).json({ error: 'Acceso denegado: No tiene permisos para consultar perfiles ajenos.' });
+    }
+
     const usuario = await Usuario.findByPk(req.params.id, {
       attributes: { exclude: ['passwordHash'] },
       include: [
@@ -258,6 +267,10 @@ const buscarUsuarioId = async (req, res) => {
 // ============================================
 const actualizarUsuario = async (req, res) => {
   try {
+    if (!tieneDerechoAcceso(req.user, req.params.id)) {
+      return res.status(403).json({ error: 'Acceso denegado: No tiene permisos para modificar perfiles ajenos.' });
+    }
+
     const usuario = await Usuario.findByPk(req.params.id);
     if (!usuario) {
       return res.status(404).json({ error: `Error de actualización: No se puede actualizar. No se encontró el usuario con ID '${req.params.id}'.` });
@@ -446,6 +459,15 @@ const actualizarUsuario = async (req, res) => {
 // ============================================
 const eliminarUsuario = async (req, res) => {
   try {
+    // REGLA: Un usuario no puede eliminarse a sí mismo mediante hard-delete (debe usar desactivarCuenta)
+    if (String(req.user.idUsuario) === String(req.params.id)) {
+       return res.status(403).json({ error: 'Operación denegada: No puede eliminar su propia cuenta permanentemente. Use la opción de desactivación.' });
+    }
+
+    if (!tieneDerechoAcceso(req.user, req.params.id)) {
+      return res.status(403).json({ error: 'Acceso denegado: No tiene permisos para eliminar perfiles ajenos.' });
+    }
+
     const usuario = await Usuario.findByPk(req.params.id);
     if (!usuario) {
       return res.status(404).json({ error: `Error de eliminación: No se puede eliminar. No se encontró el usuario con ID '${req.params.id}'.` });

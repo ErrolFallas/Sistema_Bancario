@@ -1,36 +1,29 @@
-// ============================================
-// Middleware: verificarPropiedad (Ownership)
-// Verifica si el recurso pertenece al cliente logueado
-// ============================================
-
-const { Cuenta, Tarjeta, Transaccion, Prestamo, PagoPrestamo, ClienteCuenta } = require('../models');
+const { ROLES } = require('../constants/roles');
+const { Cuenta, Tarjeta, Transaccion, Prestamo, PagoPrestamo, ClienteCuenta, Usuario } = require('../models');
 
 /**
- * Middleware dinámico que verifica si el recurso especificado por el ID en los params
- * pertenece realmente al cliente que está realizando la petición.
- * Solo se aplica si el rol del usuario es 'CLIENTE'.
- * @param {string} tipoRecurso - El tipo de modelo a evaluar ('Cuenta', 'Tarjeta', 'Transaccion', etc.)
+ * Middleware dinámico de Ownership (Propiedad)
  */
 const verificarPropiedad = (tipoRecurso) => {
   return async (req, res, next) => {
-    // Si no es cliente (ej: ADMIN, EMPLEADO), o es SUPER_ADMIN, se salta la validación de pertenencia
-    if (req.user.rol !== 'CLIENTE') {
+    if (!req.user) {
+      return res.status(401).json({ error: 'Sesión no válida.' });
+    }
+
+    // SUPER_ADMIN y ADMIN tienen inmunidad jerárquica total
+    if ([ROLES.SUPER_ADMIN, ROLES.ADMIN].includes(req.user.rol)) {
       return next();
     }
 
     const idRecurso = req.params.id;
     const idCliente = req.user.idCliente;
-
-    if (!idCliente) {
-      return res.status(403).json({ error: 'Acceso denegado: El usuario actual no tiene un cliente asociado.' });
-    }
+    const idUsuario = req.user.idUsuario;
 
     try {
       let pertenece = false;
 
       switch (tipoRecurso) {
         case 'Cuenta':
-          // Una cuenta pertenece al cliente si existe en ClienteCuenta
           const clienteCuenta = await ClienteCuenta.findOne({ where: { idCuenta: idRecurso, idCliente: idCliente } });
           if (clienteCuenta) pertenece = true;
           break;
@@ -45,7 +38,6 @@ const verificarPropiedad = (tipoRecurso) => {
 
         case 'Transaccion':
           const transaccion = await Transaccion.findByPk(idRecurso);
-          // La transacción es tuya si la originaste, o si eres el cliente explícito
           if (transaccion && transaccion.idCliente === idCliente) pertenece = true;
           break;
 
@@ -60,8 +52,12 @@ const verificarPropiedad = (tipoRecurso) => {
           break;
           
         case 'Cliente':
-          // El cliente solo puede acceder a su propio ID
-          if (parseInt(idRecurso) === parseInt(idCliente)) pertenece = true;
+          if (idCliente && String(idRecurso) === String(idCliente)) pertenece = true;
+          break;
+
+        case 'Usuario':
+          // El usuario solo puede acceder a su propio perfil
+          if (idUsuario && String(idRecurso) === String(idUsuario)) pertenece = true;
           break;
 
         default:
@@ -69,12 +65,14 @@ const verificarPropiedad = (tipoRecurso) => {
       }
 
       if (!pertenece) {
-        return res.status(403).json({ error: 'Acceso denegado. No tiene permisos para acceder o modificar este recurso porque no le pertenece.' });
+        return res.status(403).json({ 
+            error: `Acceso denegado: No tiene permisos de propiedad sobre este recurso (${tipoRecurso}).` 
+        });
       }
 
       next();
     } catch (error) {
-      return res.status(500).json({ error: 'Error interno al verificar la propiedad del recurso.', detalle: error.message });
+      return res.status(500).json({ error: 'Error interno al verificar la propiedad.', detalle: error.message });
     }
   };
 };

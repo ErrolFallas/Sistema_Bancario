@@ -28,6 +28,8 @@ const { verificarRol }    = require('../middlewares/verificarRol');
 // Controller transaccional: crea Usuario + Cliente/Empleado en una sola operación
 const { crearUsuarioCompleto } = require('../controllers/UsuarioCompletoController');
 
+const { verificarPropiedad } = require('../middlewares/verificarPropiedad');
+
 // ── Rutas protegidas por JWT ────────────────────────────────────────────
 
 // Soft-delete: el propio usuario desactiva su cuenta (cualquier rol)
@@ -42,11 +44,11 @@ router.post('/completo', autenticarToken, verificarRol('ADMIN', 'GERENTE', 'EMPL
 // Crear y listar usuarios: Staff bancario (ADMIN, GERENTE, EMPLEADO)
 // La lógica de qué roles pueden crear se aplica en el controller
 router.post('/',    autenticarToken, verificarRol('ADMIN', 'GERENTE', 'EMPLEADO'), crearUsuario);
-router.get('/',     autenticarToken, verificarRol('ADMIN', 'GERENTE', 'EMPLEADO'), buscarUsuarios);
+router.get('/',     autenticarToken, verificarRol('ADMIN', 'GERENTE', 'EMPLEADO', 'CLIENTE'), buscarUsuarios);
 
-// Ver y editar: Staff bancario
-router.get('/:id',    autenticarToken, verificarRol('ADMIN', 'GERENTE', 'EMPLEADO'), buscarUsuarioId);
-router.patch('/:id',  autenticarToken, verificarRol('ADMIN', 'GERENTE', 'EMPLEADO'), actualizarUsuario);
+// Ver y editar: Staff bancario + El propio usuario (Ownership)
+router.get('/:id',    autenticarToken, verificarRol('ADMIN', 'GERENTE', 'EMPLEADO', 'CLIENTE'), verificarPropiedad('Usuario'), buscarUsuarioId);
+router.patch('/:id',  autenticarToken, verificarRol('ADMIN', 'GERENTE', 'EMPLEADO', 'CLIENTE'), verificarPropiedad('Usuario'), actualizarUsuario);
 
 // Soft-delete de otros usuarios: ADMIN y GERENTE (jerarquía validada en controller)
 router.patch('/:id/desactivar', autenticarToken, verificarRol('ADMIN', 'GERENTE'), desactivarUsuario);
