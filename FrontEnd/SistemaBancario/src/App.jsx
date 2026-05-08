@@ -51,13 +51,22 @@ function App() {
                 <Route path="/mis-prestamos" element={<GestionPrestamos ownership />} />
               </Route>
 
-              {/* ── Staff bancario (ADMIN, GERENTE, EMPLEADO) ──── */}
+              {/* ── Staff bancario: Crear Usuarios ──────────────
+                   ADMIN, GERENTE, EMPLEADO pueden crear usuarios.
+                   Cada uno filtrado por getCreatableRoles en CrearUsuario 
+                   y puedeCrearRol en el backend. */}
               <Route element={<ProtectedRoute allowedRoles={['SUPER_ADMIN', 'ADMIN', 'GERENTE', 'EMPLEADO']} />}>
+                <Route path="/usuarios/crear" element={<CrearUsuario />} />
                 <Route path="/clientes" element={<GestionClientes />} />
                 <Route path="/cuentas" element={<GestionCuentas />} />
                 <Route path="/tarjetas" element={<GestionTarjetas />} />
+              </Route>
+
+              {/* ── Gestión de Usuarios: GERENTE+ ──────────────
+                   La tabla completa de usuarios y edición requiere
+                   al menos nivel GERENTE. EMPLEADO usa solo /crear. */}
+              <Route element={<ProtectedRoute allowedRoles={['SUPER_ADMIN', 'ADMIN', 'GERENTE']} />}>
                 <Route path="/usuarios" element={<GestionUsuarios />} />
-                <Route path="/usuarios/crear" element={<CrearUsuario />} />
                 <Route path="/usuarios/:id/editar" element={<EditarUsuario />} />
               </Route>
 

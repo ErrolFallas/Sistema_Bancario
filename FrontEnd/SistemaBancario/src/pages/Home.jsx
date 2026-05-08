@@ -1,22 +1,25 @@
 import { useAuth } from '../context/AuthContext';
 import { Link } from 'react-router-dom';
-import { isStaffRole, isAdminRole, getRoleLabel } from '../helpers/roleHelpers';
+import { isStaffRole, isAdminRole, getRoleLabel, canManageUsers } from '../helpers/roleHelpers';
 import '../css/dashboard.css';
 
 /**
  * Home — Dashboard dinámico por rol + ownership
  * ──────────────────────────────────────────────
  * CLIENTE: resumen personal, accesos rápidos a sus recursos
- * EMPLEADO: acciones operativas
- * GERENTE: gestión avanzada
+ * EMPLEADO: onboarding de clientes
+ * GERENTE: gestión operativa + onboarding
  * ADMIN/SUPER_ADMIN: panel de control con métricas
  */
 const Home = () => {
   const { user } = useAuth();
 
   const isCliente = user?.rol?.toUpperCase() === 'CLIENTE';
+  const isEmpleado = user?.rol?.toUpperCase() === 'EMPLEADO';
+  const isGerente = user?.rol?.toUpperCase() === 'GERENTE';
   const isStaff = isStaffRole(user?.rol);
   const isAdmin = isAdminRole(user?.rol);
+  const puedeCrearUsuarios = canManageUsers(user?.rol);
 
   return (
     <div className="page-container">
@@ -48,6 +51,10 @@ const Home = () => {
               <p>
                 {isCliente
                   ? 'Accede a tus cuentas, tarjetas y préstamos desde el menú de navegación.'
+                  : isEmpleado
+                  ? 'Panel de onboarding. Registra nuevos clientes del banco.'
+                  : isGerente
+                  ? 'Panel de gestión operativa. Administra personal y clientes.'
                   : 'Panel de control administrativo activo. Accede a las herramientas desde la barra de navegación.'}
               </p>
             </div>
@@ -79,8 +86,28 @@ const Home = () => {
               </>
             )}
 
-            {/* ── STAFF: Acciones rápidas operativas ── */}
-            {isStaff && (
+            {/* ── EMPLEADO: Solo onboarding de clientes ── */}
+            {isEmpleado && (
+              <>
+                <div className="card highlight">
+                  <h3>➕ Registrar Cliente</h3>
+                  <p style={{ marginBottom: '1rem' }}>Realiza el alta de nuevos clientes del banco con un solo formulario.</p>
+                  <Link to="/usuarios/crear" className="btn-primary" style={{ display: 'inline-block', textDecoration: 'none' }}>
+                    Nuevo Cliente
+                  </Link>
+                </div>
+                <div className="card">
+                  <h3>👥 Gestión de Clientes</h3>
+                  <p style={{ marginBottom: '1rem' }}>Administra clientes bancarios, consulta sus cuentas y estado.</p>
+                  <Link to="/clientes" className="btn-primary" style={{ display: 'inline-block', textDecoration: 'none' }}>
+                    Ver Clientes
+                  </Link>
+                </div>
+              </>
+            )}
+
+            {/* ── GERENTE+: Acciones administrativas ── */}
+            {(isGerente || isAdmin) && (
               <>
                 <div className="card highlight">
                   <h3>⚡ Acciones Rápidas</h3>

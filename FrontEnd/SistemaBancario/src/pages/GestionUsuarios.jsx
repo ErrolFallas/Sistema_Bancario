@@ -7,14 +7,17 @@ import DataTable from '../components/ui/DataTable';
 import FilterToggle from '../components/ui/FilterToggle';
 import ConfirmModal from '../components/ui/ConfirmModal';
 import UserRow from '../components/users/UserRow';
+import { canManageUsers, isAdminRole } from '../helpers/roleHelpers';
 import '../css/dashboard.css';
 import '../css/forms.css';
 import '../css/components.css';
 
 /**
- * Gestión de Usuarios — ADMIN / SUPER_ADMIN
- * ──────────────────────────────────────────
- * Refactorizado: usa sub-componentes, soft delete, filtros activos/inactivos.
+ * Gestión de Usuarios — Staff Bancario (RBAC Jerárquico)
+ * ──────────────────────────────────────────────────────
+ * SUPER_ADMIN / ADMIN: Vista completa con filtro de inactivos
+ * GERENTE: Vista operativa de personal subordinado
+ * EMPLEADO: Redirigido a CrearUsuario (solo onboarding de clientes)
  */
 const GestionUsuarios = () => {
   const { user } = useAuth();
@@ -28,11 +31,16 @@ const GestionUsuarios = () => {
   const [modal, setModal] = useState({ open: false, usuario: null, action: null });
   const [processing, setProcessing] = useState(false);
 
+  // ── RBAC: Permisos del usuario actual ────────────────
+  const puedeCrear = canManageUsers(user?.rol);
+  const esAdmin = isAdminRole(user?.rol);
+
   // ── Cargar usuarios ──────────────────────────────────
   const cargarUsuarios = async () => {
     try {
       setIsLoading(true);
-      const data = await usuarioService.getAll(showInactive);
+      // Solo ADMIN+ puede solicitar inactivos al backend
+      const data = await usuarioService.getAll(esAdmin && showInactive);
       setUsuarios(data);
     } catch (err) {
       toast.error(err.message || 'Error al cargar usuarios.');
@@ -102,14 +110,17 @@ const GestionUsuarios = () => {
     <div className="page-container">
       <PageHeader
         title="Gestión de Usuarios"
-        actionLabel="+ Crear Usuario"
-        actionTo="/usuarios/crear"
+        actionLabel={puedeCrear ? '+ Crear Usuario' : undefined}
+        actionTo={puedeCrear ? '/usuarios/crear' : undefined}
       >
-        <FilterToggle
-          showInactive={showInactive}
-          onToggle={setShowInactive}
-          label="Mostrar inactivos"
-        />
+        {/* Solo ADMIN+ puede ver/filtrar usuarios inactivos */}
+        {esAdmin && (
+          <FilterToggle
+            showInactive={showInactive}
+            onToggle={setShowInactive}
+            label="Mostrar inactivos"
+          />
+        )}
       </PageHeader>
 
       <DataTable
@@ -118,8 +129,8 @@ const GestionUsuarios = () => {
         isLoading={isLoading}
         loadingMessage="Cargando usuarios..."
         emptyPreset="usuarios"
-        emptyActionLabel="Crear primer usuario"
-        emptyActionTo="/usuarios/crear"
+        emptyActionLabel={puedeCrear ? 'Crear primer usuario' : undefined}
+        emptyActionTo={puedeCrear ? '/usuarios/crear' : undefined}
         renderRow={(u) => (
           <UserRow
             key={u.idUsuario}

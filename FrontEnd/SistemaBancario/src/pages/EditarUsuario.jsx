@@ -5,7 +5,7 @@ import { useToastContext } from '../context/ToastContext';
 import usuarioService from '../services/usuarioService';
 import rolService from '../services/rolService';
 import CustomSelect from '../components/ui/CustomSelect';
-import { canCreate, hasSeniority } from '../helpers/roleHelpers';
+import { getCreatableRoles, hasSeniority } from '../helpers/roleHelpers';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
 import '../css/forms.css';
 import '../css/dashboard.css';
@@ -90,13 +90,13 @@ const EditarUsuario = () => {
     }
   };
 
-  // ── Filtrar roles disponibles según gobernanza ───────────────
+  // ── Filtrar roles disponibles según gobernanza RBAC ──────────
+  const rolesCreables = getCreatableRoles(user?.rol);
   const rolesDisponibles = roles.filter(r => {
-    if (!user?.rol) return false;
-    // Un SUPER_ADMIN puede promover a cualquier rol (incluyendo SUPER_ADMIN)
-    if (user.rol === 'SUPER_ADMIN') return true;
-    // Los demás usan la matriz de creación/promoción oficial
-    return canCreate(user.rol, r.nombre);
+    const nombre = r.nombre.toUpperCase();
+    // Siempre incluir el rol actual del usuario editado para visualización
+    if (usuario && r.idRol === usuario.idRol) return true;
+    return rolesCreables.includes(nombre);
   });
 
   if (isLoading) return <LoadingSpinner message="Obteniendo datos del usuario..." />;

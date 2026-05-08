@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { canAccess, canManageUsers } from '../helpers/roleHelpers';
 
 // Components
 import NavDropdown from './layout/NavDropdown';
@@ -20,47 +21,54 @@ const Navbar = () => {
     navigate('/login');
   };
 
-  // ── Configuración de Menús (Arquitectura Enterprise) ───────────
+  // ── Configuración de Menús con RBAC Granular ──────────────────
+  // Cada item define los roles que pueden verlo.
+  // SUPER_ADMIN accede a todo (manejado por canAccess).
   
   const menuGroups = [
     {
       title: 'Operaciones',
+      // Visible para todo el staff bancario (no CLIENTE)
+      roles: ['SUPER_ADMIN', 'ADMIN', 'GERENTE', 'EMPLEADO'],
       items: [
-        { label: 'Clientes', path: '/clientes', icon: '👥', description: 'Gestión de perfiles de clientes' },
-        { label: 'Cuentas', path: '/cuentas', icon: '💰', description: 'Control de productos financieros' },
-        { label: 'Tarjetas', path: '/tarjetas', icon: '💳', description: 'Emisión y administración de tarjetas' },
-        { label: 'Préstamos', path: '/prestamos', icon: '🏠', description: 'Créditos y financiamiento' },
-        { label: 'Transacciones', path: '/transacciones', icon: '🔄', description: 'Historial de movimientos' },
+        { label: 'Clientes', path: '/clientes', icon: '👥', description: 'Gestión de perfiles de clientes', roles: ['SUPER_ADMIN', 'ADMIN', 'GERENTE', 'EMPLEADO'] },
+        { label: 'Cuentas', path: '/cuentas', icon: '💰', description: 'Control de productos financieros', roles: ['SUPER_ADMIN', 'ADMIN', 'GERENTE', 'EMPLEADO'] },
+        { label: 'Tarjetas', path: '/tarjetas', icon: '💳', description: 'Emisión y administración de tarjetas', roles: ['SUPER_ADMIN', 'ADMIN', 'GERENTE', 'EMPLEADO'] },
+        { label: 'Préstamos', path: '/prestamos', icon: '🏠', description: 'Créditos y financiamiento', roles: ['SUPER_ADMIN', 'ADMIN', 'GERENTE'] },
+        { label: 'Transacciones', path: '/transacciones', icon: '🔄', description: 'Historial de movimientos', roles: ['SUPER_ADMIN', 'ADMIN', 'GERENTE'] },
       ]
     },
     {
       title: 'Administración',
+      // Staff ve menú de Administración — cada item se filtra por rol
+      roles: ['SUPER_ADMIN', 'ADMIN', 'GERENTE', 'EMPLEADO'],
       items: [
-        { label: 'Usuarios', path: '/usuarios', icon: '👤', description: 'Gestión de personal del sistema' },
-        { label: 'Roles', path: '/roles', icon: '🔑', description: 'Control de acceso jerárquico' },
-        { label: 'Bancos', path: '/bancos', icon: '🏢', description: 'Configuración de entidades' },
+        { label: 'Usuarios', path: '/usuarios', icon: '👤', description: 'Gestión de personal del sistema', roles: ['SUPER_ADMIN', 'ADMIN', 'GERENTE'] },
+        { label: 'Crear Usuario', path: '/usuarios/crear', icon: '➕', description: 'Onboarding de personal y clientes', roles: ['SUPER_ADMIN', 'ADMIN', 'GERENTE', 'EMPLEADO'] },
+        { label: 'Roles', path: '/roles', icon: '🔑', description: 'Control de acceso jerárquico', roles: ['SUPER_ADMIN'] },
+        { label: 'Bancos', path: '/bancos', icon: '🏢', description: 'Configuración de entidades', roles: ['SUPER_ADMIN', 'ADMIN'] },
       ]
     },
     {
       title: 'Seguridad',
+      roles: ['SUPER_ADMIN', 'ADMIN'],
       items: [
-        { label: 'Auditoría', path: '/auditoria', icon: '📋', description: 'Logs de eventos del sistema' },
-        { label: 'Sesiones', path: '/sesiones', icon: '⏱️', description: 'Control de actividad activa' },
+        { label: 'Auditoría', path: '/auditoria', icon: '📋', description: 'Logs de eventos del sistema', roles: ['SUPER_ADMIN', 'ADMIN'] },
+        { label: 'Sesiones', path: '/sesiones', icon: '⏱️', description: 'Control de actividad activa', roles: ['SUPER_ADMIN', 'ADMIN'] },
       ]
     }
   ];
 
-  // Filtros de Rol (RBAC)
-  const isAdmin = user?.rol === 'ADMIN' || user?.rol === 'SUPER_ADMIN';
-  const isManagement = isAdmin || user?.rol === 'GERENTE';
-
-  // Solo mostrar grupos según permisos
-  const filteredGroups = menuGroups.filter(group => {
-    if (group.title === 'Administración' || group.title === 'Seguridad') {
-      return isManagement;
-    }
-    return true; // Operaciones visible para staff
-  });
+  // ── Filtrado dinámico RBAC ────────────────────────────────────
+  const filteredGroups = user
+    ? menuGroups
+        .filter(group => canAccess(user.rol, group.roles))
+        .map(group => ({
+          ...group,
+          items: group.items.filter(item => canAccess(user.rol, item.roles))
+        }))
+        .filter(group => group.items.length > 0) // Ocultar grupos vacíos
+    : [];
 
   return (
     <header className="navbar-enterprise">

@@ -6,7 +6,7 @@ import usuarioService from '../services/usuarioService';
 import rolService from '../services/rolService';
 import bancoService from '../services/bancoService';
 import CustomSelect from '../components/ui/CustomSelect';
-import { canCreate } from '../helpers/roleHelpers';
+import { getCreatableRoles, getRoleLabel, canManageUsers } from '../helpers/roleHelpers';
 import '../css/forms.css';
 import '../css/dashboard.css';
 
@@ -176,12 +176,27 @@ const CrearUsuario = () => {
     }
   };
 
-  // ── Filtrar roles que este usuario puede asignar ───────────────
-  const rolesDisponibles = roles.filter(r => {
-    const nombre = r.nombre.toUpperCase();
-    if (!user?.rol) return false;
-    return canCreate(user.rol, nombre);
-  });
+  // ── Filtrar roles que este usuario puede asignar (RBAC dinámico) ──
+  const rolesCreables = getCreatableRoles(user?.rol);
+  const rolesDisponibles = roles.filter(r =>
+    rolesCreables.includes(r.nombre.toUpperCase())
+  );
+
+  // ── Contexto visual por rol del actor ─────────────────────────────
+  const getHeaderInfo = () => {
+    const rol = user?.rol?.toUpperCase();
+    switch (rol) {
+      case 'EMPLEADO':
+        return { titulo: 'Registrar Cliente', desc: 'Onboarding — Alta de nuevos clientes del banco' };
+      case 'GERENTE':
+        return { titulo: 'Crear Usuario', desc: 'Gestión de personal operativo y clientes' };
+      case 'ADMIN':
+        return { titulo: 'Crear Usuario', desc: 'Administración organizacional de personal' };
+      default:
+        return { titulo: 'Crear Usuario', desc: 'Formulario inteligente para gestión de personal y clientes' };
+    }
+  };
+  const headerInfo = getHeaderInfo();
 
   if (loadingDatos) {
     return (
@@ -198,8 +213,8 @@ const CrearUsuario = () => {
         <header className="form-header">
           <div className="header-icon">👤</div>
           <div className="header-text">
-            <h2>Crear Usuario</h2>
-            <p>Formulario inteligente para gestión de personal y clientes</p>
+            <h2>{headerInfo.titulo}</h2>
+            <p>{headerInfo.desc}</p>
           </div>
         </header>
 
@@ -382,7 +397,7 @@ const CrearUsuario = () => {
               <button 
                 type="button" 
                 className="btn-secondary" 
-                onClick={() => navigate('/usuarios')} 
+                onClick={() => navigate(user?.rol === 'EMPLEADO' ? '/' : '/usuarios')} 
                 disabled={isLoading}
               >
                 Cancelar

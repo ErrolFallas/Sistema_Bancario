@@ -148,6 +148,11 @@ const crearUsuario = async (req, res) => {
     }
 
     // --- LOGICA DE JERARQUÍA DE CREACIÓN ---
+    // DEFENSA EN PROFUNDIDAD: Bloquear CLIENTE explícitamente
+    if (req.user?.rol === 'CLIENTE') {
+      return res.status(403).json({ error: 'No tienes permisos para crear usuarios.' });
+    }
+
     if (req.user && !puedeCrearRol(req.user.rol, nombreRolSolicitado)) {
       await registrarAuditoria({
         idUsuario: req.user.idUsuario,
@@ -156,7 +161,7 @@ const crearUsuario = async (req, res) => {
         descripcion: `Intento de creación de rol superior: ${req.user.rol} intentó crear ${nombreRolSolicitado}`,
         ip: req.ip,
       });
-      return res.status(403).json({ error: `Jerarquía Bancaria: Su rol (${req.user.rol}) no tiene permisos para crear usuarios con nivel (${nombreRolSolicitado}).` });
+      return res.status(403).json({ error: `No tienes permisos para crear usuarios con ese rol. Su rol (${req.user.rol}) no puede crear nivel (${nombreRolSolicitado}).` });
     }
     // -------------------------------------
 

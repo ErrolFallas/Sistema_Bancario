@@ -131,3 +131,37 @@ export const getRoleLabel = (roleName) => {
 export const isStaffRole = (roleName) => STAFF_ROLES.includes(roleName?.toUpperCase());
 export const isAdminRole = (roleName) => ADMIN_ROLES.includes(roleName?.toUpperCase());
 export const isProtectedRole = (roleName) => PROTECTED_ROLES.includes(roleName?.toUpperCase());
+
+// ── Roles que tienen acceso a crear usuarios ────────────────
+export const USER_CREATION_ROLES = ['SUPER_ADMIN', 'ADMIN', 'GERENTE', 'EMPLEADO'];
+
+/**
+ * Retorna la lista de nombres de roles que el actor puede crear.
+ * Usado para construir dinámicamente el selector de roles en formularios.
+ */
+export const getCreatableRoles = (actorRole) => {
+  if (!actorRole) return [];
+  const actor = actorRole.toUpperCase();
+
+  switch (actor) {
+    case 'SUPER_ADMIN':
+      return ['SUPER_ADMIN', 'ADMIN', 'GERENTE', 'EMPLEADO', 'CLIENTE'];
+    case 'ADMIN':
+      return ['GERENTE', 'EMPLEADO', 'CLIENTE'];
+    case 'GERENTE':
+      return ['EMPLEADO', 'CLIENTE'];
+    case 'EMPLEADO':
+      return ['CLIENTE'];
+    default:
+      return [];
+  }
+};
+
+/**
+ * Determina si un rol tiene acceso a funcionalidades de gestión de usuarios.
+ * CLIENTE no puede gestionar usuarios.
+ */
+export const canManageUsers = (roleName) => {
+  if (!roleName) return false;
+  return USER_CREATION_ROLES.includes(roleName.toUpperCase());
+};

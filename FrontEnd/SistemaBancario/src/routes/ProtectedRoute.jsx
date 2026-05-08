@@ -1,5 +1,6 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { canAccess } from '../helpers/roleHelpers';
 
 /**
  * Componente Wrapper para proteger rutas
@@ -11,6 +12,9 @@ import { useAuth } from '../context/AuthContext';
  * 2. No autenticado: Redirige a /login.
  * 3. Autenticado pero rol incorrecto: Redirige a /unauthorized.
  * 4. Todo OK: Renderiza el contenido de la ruta (Outlet).
+ *
+ * Usa canAccess() de roleHelpers para centralizar la lógica de
+ * bypass de SUPER_ADMIN y verificación jerárquica.
  */
 const ProtectedRoute = ({ allowedRoles }) => {
   const { user, loading } = useAuth();
@@ -30,8 +34,8 @@ const ProtectedRoute = ({ allowedRoles }) => {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // 3. Si hay usuario pero se requiere un rol específico y el usuario no lo tiene
-  if (allowedRoles && !allowedRoles.includes(user.rol?.toUpperCase())) {
+  // 3. Si hay roles requeridos, verificar con canAccess (SUPER_ADMIN bypass incluido)
+  if (allowedRoles && !canAccess(user.rol, allowedRoles)) {
     return <Navigate to="/unauthorized" replace />;
   }
 

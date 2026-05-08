@@ -21,7 +21,8 @@ const {
 } = require("../controllers/RolController");
 
 router.post("/", autenticarToken, verificarRol('SUPER_ADMIN'), crearRol);
-router.get("/", autenticarToken, verificarRol('SUPER_ADMIN'), buscarRoles);
+// GET: Staff necesita leer roles para el selector en CrearUsuario/EditarUsuario
+router.get("/", autenticarToken, verificarRol('ADMIN', 'GERENTE', 'EMPLEADO'), buscarRoles);
 router.get("/:id", autenticarToken, verificarRol('SUPER_ADMIN'), buscarRolId);
 router.delete("/:id", autenticarToken, verificarRol('SUPER_ADMIN'), eliminarRol);
 router.patch("/:id", autenticarToken, verificarRol('SUPER_ADMIN'), actualizarRol);

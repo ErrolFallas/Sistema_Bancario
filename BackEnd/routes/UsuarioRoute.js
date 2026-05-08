@@ -1,7 +1,11 @@
 // ============================================
 // Rutas: Usuario
 // Todas las rutas requieren JWT válido.
-// Rutas de admin requieren rol 'admin'.
+// RBAC Jerárquico: SUPER_ADMIN > ADMIN > GERENTE > EMPLEADO > CLIENTE
+// ─────────────────────────────────────────────
+// El middleware verificarRol controla el ACCESO al endpoint.
+// La lógica de puedeCrearRol (en controllers) controla QUÉ
+// roles puede asignar cada actor. Son dos capas complementarias.
 // ============================================
 
 const express = require('express');
@@ -28,21 +32,25 @@ const { crearUsuarioCompleto } = require('../controllers/UsuarioCompletoControll
 
 // Soft-delete: el propio usuario desactiva su cuenta (cualquier rol)
 // ⚠️ Debe ir ANTES de /:id para que Express no la interprete como un param
-router.patch('/eliminar-cuenta', autenticarToken, verificarRol('CLIENTE', 'EMPLEADO'), desactivarCuenta);
+router.patch('/eliminar-cuenta', autenticarToken, verificarRol('CLIENTE', 'EMPLEADO', 'GERENTE', 'ADMIN'), desactivarCuenta);
 
 // Endpoint transaccional: crear usuario con cliente/empleado asociado
 // ⚠️ Debe ir ANTES de /:id para que Express no lo interprete como un param
-router.post('/completo', autenticarToken, verificarRol('ADMIN'), crearUsuarioCompleto);
+// ACCESO: ADMIN, GERENTE, EMPLEADO (cada uno filtrado por puedeCrearRol en controller)
+router.post('/completo', autenticarToken, verificarRol('ADMIN', 'GERENTE', 'EMPLEADO'), crearUsuarioCompleto);
 
-// Solo ADMIN puede crear y listar todos los usuarios
-router.post('/',    autenticarToken, verificarRol('ADMIN'), crearUsuario);
-router.get('/',     autenticarToken, verificarRol('ADMIN'), buscarUsuarios);
+// Crear y listar usuarios: Staff bancario (ADMIN, GERENTE, EMPLEADO)
+// La lógica de qué roles pueden crear se aplica en el controller
+router.post('/',    autenticarToken, verificarRol('ADMIN', 'GERENTE', 'EMPLEADO'), crearUsuario);
+router.get('/',     autenticarToken, verificarRol('ADMIN', 'GERENTE', 'EMPLEADO'), buscarUsuarios);
 
-// ADMIN puede ver y editar cualquier usuario
-router.get('/:id',    autenticarToken, verificarRol('ADMIN'), buscarUsuarioId);
-router.patch('/:id',  autenticarToken, verificarRol('ADMIN'), actualizarUsuario);
-router.patch('/:id/desactivar', autenticarToken, verificarRol('ADMIN'), desactivarUsuario);
-router.patch('/:id/reactivar', autenticarToken, verificarRol('ADMIN'), reactivarUsuario);
+// Ver y editar: Staff bancario
+router.get('/:id',    autenticarToken, verificarRol('ADMIN', 'GERENTE', 'EMPLEADO'), buscarUsuarioId);
+router.patch('/:id',  autenticarToken, verificarRol('ADMIN', 'GERENTE', 'EMPLEADO'), actualizarUsuario);
+
+// Soft-delete de otros usuarios: ADMIN y GERENTE (jerarquía validada en controller)
+router.patch('/:id/desactivar', autenticarToken, verificarRol('ADMIN', 'GERENTE'), desactivarUsuario);
+router.patch('/:id/reactivar', autenticarToken, verificarRol('ADMIN', 'GERENTE'), reactivarUsuario);
 
 // Hard-delete: EXCLUSIVO para ADMIN
 router.delete('/:id', autenticarToken, verificarRol('ADMIN'), eliminarUsuario);

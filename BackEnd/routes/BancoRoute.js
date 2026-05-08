@@ -21,7 +21,8 @@ const {
 } = require("../controllers/BancoController");
 
 router.post("/", autenticarToken, verificarRol('ADMIN'), crearBanco);
-router.get("/", autenticarToken, verificarRol('ADMIN'), buscarBancos);
+// GET: Staff necesita leer bancos para el selector en CrearUsuario (rol EMPLEADO/GERENTE)
+router.get("/", autenticarToken, verificarRol('ADMIN', 'GERENTE', 'EMPLEADO'), buscarBancos);
 router.get("/:id", autenticarToken, verificarRol('ADMIN'), buscarBancoId);
 router.delete("/:id", autenticarToken, verificarRol('ADMIN'), eliminarBanco);
 router.patch("/:id", autenticarToken, verificarRol('ADMIN'), actualizarBanco);
