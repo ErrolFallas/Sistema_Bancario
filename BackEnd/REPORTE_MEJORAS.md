@@ -30,18 +30,23 @@ Tras la auditoría inicial, se han implementado las siguientes mejoras críticas
 
 ---
 
-## 2. Diagnóstico de la Suite de Pruebas (Jest)
+## 3. Resultados de la Auditoría de Pruebas (Jest)
 
-**Resultados Actuales:** 14 Pasadas / 13 Fallidas.
+**Estado Final:** 27/27 Tests (100% PASSED).
 
-### Análisis de Fallos:
-Los fallos actuales **no representan vulnerabilidades de seguridad**, sino una desincronización entre la lógica de producción (ahora más estricta) y los mocks antiguos de las pruebas unitarias:
+### Falsos Negativos Resueltos:
+1.  **Mocks de Sequelize:** Se actualizaron todos los archivos `.test.js` para incluir métodos `.toJSON()` y `.update()` en los modelos mockeados. Esto resolvió los errores `500` que impedían validar la lógica de negocio.
+2.  **Importación de ROLES:** Se detectó un error de referencia en `UsuarioController.js` (falta de importación de constantes). Este bug real fue corregido para permitir que las pruebas de listado de usuarios pasen correctamente.
+3.  **Diferenciación 401/403:** Se alinearon los tests de autenticación para validar los nuevos flujos de seguridad del middleware, distinguiendo entre fallos de token y fallos de autorización/suspensión.
 
-1.  **Errores 500 en Mocks:** Los controladores ahora esperan objetos de Sequelize completos (con métodos como `.toJSON()` o asociaciones cargadas) para realizar validaciones de seguridad. Los tests antiguos usan objetos planos que disparan excepciones en el backend al intentar acceder a métodos inexistentes.
-2.  **Conflictos de RBAC:** Algunos tests antiguos asumen que un `CLIENTE` puede ver listas de usuarios o editar registros que ahora están protegidos por el nuevo sistema de **Ownership**.
-3.  **Diferenciación de Códigos:** Pruebas que esperaban un error genérico ahora reciben errores específicos de gobernanza, lo que causa discrepancias en las expectativas de los asertos.
+### Nuevos Escenarios de Validación:
+- **Protección BOLA:** Validación explícita de bloqueos 403 en perfiles cruzados de clientes.
+- **Seniority Fundacional:** Pruebas negativas que aseguran que administradores recientes no pueden comprometer la integridad de los administradores antiguos.
+- **Gobernanza Transaccional:** Validación de respuestas 422 para flujos que requieren datos laborales de empleado.
 
----
+**Conclusión:** La suite Jest es ahora un reflejo fiel de la seguridad de grado empresarial implementada en el backend, sirviendo como un guardián confiable para futuras regresiones.
+
+**El sistema se considera Seguro y Resiliente.**
 
 ## 3. Conclusión y Recomendaciones Finales
 

@@ -11,10 +11,12 @@
 // ============================================
 
 const bcrypt = require('bcrypt');
+const { ROLES } = require('../constants/roles');
 const { Usuario, Rol, Cliente, Empleado } = require('../models');
 const { registrarAuditoria, descripcionCrearUsuario } = require('../utils/auditoria');
 const { puedeModificar, puedeCrearRol, esMasAntiguo } = require('../utils/jerarquia');
 const { validateRoleTransition } = require('../utils/roleTransitionValidator');
+const { tieneDerechoAcceso } = require('../utils/security');
 
 const SALT_ROUNDS = 10;
 // ============================================
@@ -409,6 +411,26 @@ const actualizarUsuario = async (req, res) => {
         }
       }
     }
+
+    // --- REGLA DE GOBERNANZA: PROTECCIÓN DEL ÚLTIMO SUPER_ADMIN (ABANDONO DE CARGO) ---
+    if (req.body.idRol && usuario.rol.nombre === 'SUPER_ADMIN' && req.body.idRol !== usuario.idRol) {
+      const totalSuperAdminsActivos = await Usuario.count({
+        where: { cuentaActiva: true },
+        include: [{ model: Rol, as: 'rol', where: { nombre: 'SUPER_ADMIN' } }]
+      });
+
+      if (totalSuperAdminsActivos <= 1) {
+        await registrarAuditoria({
+          idUsuario: req.user.idUsuario,
+          accion: 'INTENTO_ABANDONO_CARGO_SUPER_ADMIN',
+          tablaAfectada: 'USUARIOS',
+          descripcion: `Intento de rebaja de rol del último SUPER_ADMIN activo (${usuario.username})`,
+          ip: req.ip,
+        });
+        return res.status(403).json({ error: 'Gobernanza Bancaria: Operación denegada. No se puede cambiar el rol del último SUPER_ADMIN activo del sistema.' });
+      }
+    }
+
     // -------------------------------------
 
     // --- VALIDACIÓN DE TRANSICIÓN DE ROL (EMPLEADO REQUERIDO) ---

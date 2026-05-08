@@ -43,7 +43,8 @@ describe('Pruebas de Autenticación (Auth)', () => {
                 cuentaActiva: true,
                 usuarioLogeado: false,
                 update: jest.fn().mockResolvedValue(true),
-                rol: { nombre: 'SUPER_ADMIN', isActive: true }
+                rol: { nombre: 'SUPER_ADMIN', isActive: true },
+                toJSON: function() { return { ...this, rol: this.rol.nombre }; }
             };
 
             Usuario.findOne.mockResolvedValue(mockUser);
@@ -110,7 +111,9 @@ describe('Pruebas de Autenticación (Auth)', () => {
 
         it('Debe retornar 403 si el token es corrupto o inválido', async () => {
             jest.spyOn(jwt, 'verify').mockImplementation(() => {
-                throw new Error('JsonWebTokenError');
+                const err = new Error('Invalid token');
+                err.name = 'JsonWebTokenError';
+                throw err;
             });
 
             const res = await request(app)

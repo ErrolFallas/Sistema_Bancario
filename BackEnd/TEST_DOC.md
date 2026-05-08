@@ -47,7 +47,24 @@ La implementación de pruebas unitarias e integración en el backend del Sistema
 
 ---
 
-*Nota técnica: Las pruebas de seguridad automatizadas en `test/security_hardening.test.js` validan estos controles mediante escenarios de ataque simulados (pruebas negativas).*
+## Actualización de Suite Jest (Fase 3: Senior QA)
+
+### 1. Corrección de Falsos Negativos y Mocks de Alta Fidelidad
+- **Problema:** Los tests antiguos fallaban con errores `500` porque los mocks de Sequelize carecían de métodos como `.toJSON()` y `.update()`, los cuales ahora son esenciales para la lógica de seguridad y auditoría.
+- **Solución:** Se implementaron helpers de creación de instancias mock que imitan el comportamiento real de los modelos de Sequelize, incluyendo persistencia simulada en memoria para el método `.update()`.
+- **Resultado:** Eliminación de bloqueos técnicos en la suite de pruebas.
+
+### 2. Detección y Resolución de Bugs Legítimos
+- **Hallazgo Crítico:** Se detectó que `UsuarioController.js` utilizaba la constante `ROLES` y la utilidad `tieneDerechoAcceso` sin haberlas importado, lo que disparaba errores fatales en tiempo de ejecución al listar o consultar usuarios.
+- **Corrección:** Se sincronizaron las importaciones en el controlador, resolviendo el bug "fantasma" que afectaba la estabilidad del backend.
+
+### 3. Alineación con Reglas de Gobernanza y Ownership
+- **Ajuste de Expectativas:** Pruebas que antes fallaban al intentar realizar acciones no autorizadas (como un `CLIENTE` editando a otro) ahora validan correctamente el código `403 Forbidden` y los mensajes de error específicos de **Ownership**.
+- **Jerarquía:** Se actualizaron los tests de reactivación y desactivación para validar estrictamente las reglas de **Seniority** (SUPER_ADMIN antiguo protegido) y **RBAC Jerárquico** (ADMIN > GERENTE).
+
+### 4. Sincronización de Autenticación (401 vs 403)
+- **Mejora:** Se corrigieron los mocks de JWT y sesión para asegurar que los campos `cuentaActiva` y `usuarioLogeado` sean validados correctamente por el middleware `autenticarToken.js`.
+- **Impacto:** Transición de una suite con fallos aleatorios a una suite determinista alineada con la seguridad productiva.
 
 
 ### usuario.test.js
