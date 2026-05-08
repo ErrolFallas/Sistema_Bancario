@@ -269,69 +269,39 @@ const buscarUsuarioId = async (req, res) => {
 // ============================================
 const actualizarUsuario = async (req, res) => {
   try {
+    // 1. Verificar derecho de acceso (Ownership/RBAC)
     if (!tieneDerechoAcceso(req.user, req.params.id)) {
       return res.status(403).json({ error: 'Acceso denegado: No tiene permisos para modificar perfiles ajenos.' });
     }
 
-    const usuario = await Usuario.findByPk(req.params.id);
+    // 2. Buscar usuario con su rol asociado
+    const usuario = await Usuario.findByPk(req.params.id, {
+      include: [{ model: Rol, as: 'rol' }]
+    });
+
     if (!usuario) {
-      return res.status(404).json({ error: `Error de actualización: No se puede actualizar. No se encontró el usuario con ID '${req.params.id}'.` });
+      return res.status(404).json({ error: `Error de actualización: No se encontró el usuario con ID '${req.params.id}'.` });
     }
 
-    // Si se cambia de rol, validar las reglas del nuevo rol
-    const nuevoIdRol = req.body.idRol || usuario.idRol;
-    const nuevoIdCliente = req.body.hasOwnProperty('idCliente') ? req.body.idCliente : usuario.idCliente;
-    const nuevoIdEmpleado = req.body.hasOwnProperty('idEmpleado') ? req.body.idEmpleado : usuario.idEmpleado;
+    const nombreRolActual = usuario.rol ? usuario.rol.nombre.toUpperCase() : 'CLIENTE';
 
-    if (req.body.username) {
-      req.body.username = req.body.username.trim().toLowerCase();
-      const existeUsername = await Usuario.findOne({ where: { username: req.body.username } });
-      if (existeUsername && existeUsername.idUsuario !== usuario.idUsuario) {
-        return res.status(400).json({ error: 'El nombre de usuario ya se encuentra registrado.' });
-      }
-    }
-
-    if (req.body.email) {
-      req.body.email = req.body.email.trim().toLowerCase();
-      const existeEmail = await Usuario.findOne({ where: { email: req.body.email } });
-      if (existeEmail && existeEmail.idUsuario !== usuario.idUsuario) {
-        return res.status(400).json({ error: 'El correo electrónico ya se encuentra registrado.' });
-      }
-    }
-
-    // Validar reglas por rol (solo si se está cambiando rol o relaciones)
-    // isTransition = true: estamos ACTUALIZANDO, no creando. Si falta id_empleado
-    // para GERENTE/EMPLEADO, se delega al roleTransitionValidator (422 + modal)
-    if (req.body.idRol || req.body.hasOwnProperty('idCliente') || req.body.hasOwnProperty('idEmpleado')) {
-      const isTransition = !!req.body.idRol && req.body.idRol !== usuario.idRol;
-      const validacion = await validarReglasRol(nuevoIdRol, nuevoIdCliente, nuevoIdEmpleado, req.user?.rol, isTransition);
-      if (!validacion.valido) {
-        return res.status(validacion.status).json({ error: validacion.error });
-      }
-    }
-
-    // --- LOGICA DE JERARQUÍA DE ROLES ---
-    const rolActual = await Rol.findByPk(usuario.idRol);
-    const nombreRolAfectado = rolActual ? rolActual.nombre.toUpperCase() : 'CLIENTE';
-
-    // ── REGLA: Un SUPER_ADMIN NO puede desactivar su cuenta directamente ──
-    // (Esta validación se repite en los métodos de desactivación)
-
-    if (req.user && !puedeModificar(req.user.rol, nombreRolAfectado)) {
+    // 3. Validar jerarquía de modificación
+    if (req.user && !puedeModificar(req.user.rol, nombreRolActual)) {
       await registrarAuditoria({
         idUsuario: req.user.idUsuario,
         accion: 'INTENTO_ESCALAMIENTO_PRIVILEGIOS',
         tablaAfectada: 'USUARIOS',
-        descripcion: `Intento de modificación prohibida: ${req.user.rol} intentó modificar a ${nombreRolAfectado} (${usuario.username})`,
+        descripcion: `Intento de modificación prohibida: ${req.user.rol} intentó modificar a ${nombreRolActual} (${usuario.username})`,
         ip: req.ip,
       });
-      return res.status(403).json({ error: `Jerarquía Bancaria: Su rol (${req.user.rol}) no tiene permisos para modificar a un usuario con nivel (${nombreRolAfectado}).` });
+      return res.status(403).json({ error: `Jerarquía Bancaria: Su rol (${req.user.rol}) no tiene permisos para modificar a un usuario con nivel (${nombreRolActual}).` });
     }
 
-    // --- PROTECCIÓN DE SENIORITY (SUPER_ADMIN) ---
-    // Regla: Solo aplica sobre OTROS Super Admins, no sobre sí mismo.
-    if (req.user.rol === 'SUPER_ADMIN' && nombreRolAfectado === 'SUPER_ADMIN' && req.user.idUsuario !== usuario.idUsuario) {
-      const actor = await Usuario.findByPk(req.user.idUsuario);
+    // 4. Protección de Seniority (SUPER_ADMIN)
+    if (req.user.rol === 'SUPER_ADMIN' && nombreRolActual === 'SUPER_ADMIN' && req.user.idUsuario !== usuario.idUsuario) {
+      const actor = await Usuario.findByPk(req.user.idUsuario, {
+        include: [{ model: Rol, as: 'rol' }]
+      });
       if (!esMasAntiguo(actor, usuario)) {
         await registrarAuditoria({
           idUsuario: req.user.idUsuario,
@@ -344,76 +314,48 @@ const actualizarUsuario = async (req, res) => {
       }
     }
 
-    // --- REGLA: AUTO-REBAJA DE ROL (SUPER_ADMIN -> OTRO) ---
-    if (req.user.idUsuario === usuario.idUsuario && nombreRolAfectado === 'SUPER_ADMIN' && req.body.idRol) {
-      const nuevoRolObj = await Rol.findByPk(req.body.idRol);
-      const nuevoNombreRol = nuevoRolObj?.nombre?.toUpperCase();
+    // 5. Preparar datos de actualización y validar reglas de negocio
+    const nuevoIdRol = req.body.idRol || usuario.idRol;
+    const nuevoIdCliente = req.body.hasOwnProperty('idCliente') ? req.body.idCliente : usuario.idCliente;
+    const nuevoIdEmpleado = req.body.hasOwnProperty('idEmpleado') ? req.body.idEmpleado : usuario.idEmpleado;
 
-      if (nuevoNombreRol !== 'SUPER_ADMIN') {
-        const totalSuperAdminsActivos = await Usuario.count({
-          where: { cuentaActiva: true },
-          include: [{ model: Rol, as: 'rol', where: { nombre: 'SUPER_ADMIN' } }]
-        });
+    if (req.body.idRol || req.body.hasOwnProperty('idCliente') || req.body.hasOwnProperty('idEmpleado')) {
+      const isTransition = !!req.body.idRol && req.body.idRol !== usuario.idRol;
+      const validacionReglas = await validarReglasRol(nuevoIdRol, nuevoIdCliente, nuevoIdEmpleado, req.user?.rol, isTransition);
+      if (!validacionReglas.valido) {
+        return res.status(validacionReglas.status).json({ error: validacionReglas.error });
+      }
 
-        if (totalSuperAdminsActivos <= 1) {
-          await registrarAuditoria({
-            idUsuario: req.user.idUsuario,
-            accion: 'INTENTO_ABANDONAR_ULTIMO_SUPER_ADMIN',
-            tablaAfectada: 'USUARIOS',
-            descripcion: `Intento fallido de abandonar el rol SUPER_ADMIN siendo el último activo.`,
-            ip: req.ip,
-          });
-          return res.status(403).json({ error: 'Gobernanza Crítica: No puedes abandonar el rol SUPER_ADMIN porque eres el último SUPER_ADMIN activo del sistema.' });
-        }
+      // Validaciones específicas de transición de rol (EMPLEADO/GERENTE)
+      if (isTransition) {
+        const rolDestino = await Rol.findByPk(req.body.idRol);
+        const nombreRolDestino = rolDestino?.nombre?.toUpperCase();
         
-        await registrarAuditoria({
-          idUsuario: req.user.idUsuario,
-          accion: 'CAMBIO_ROL_SUPER_ADMIN_A_ADMIN',
-          tablaAfectada: 'USUARIOS',
-          descripcion: `El usuario ${usuario.username} se ha rebajado voluntariamente de SUPER_ADMIN a ${nuevoNombreRol}.`,
-          ip: req.ip,
-        });
-      }
-    }
-
-    if (req.body.idRol) {
-      const rolSolicitado = await Rol.findByPk(req.body.idRol);
-      const nombreRolSolicitado = rolSolicitado?.nombre?.toUpperCase();
-
-      const actorRol = req.user?.rol?.toUpperCase();
-      if (rolSolicitado && actorRol && !puedeCrearRol(actorRol, nombreRolSolicitado)) {
-        await registrarAuditoria({
-          idUsuario: req.user.idUsuario,
-          accion: 'INTENTO_ESCALAMIENTO_PRIVILEGIOS',
-          tablaAfectada: 'USUARIOS',
-          descripcion: `Intento de promoción prohibida: ${actorRol} intentó promover a ${nombreRolSolicitado}`,
-          ip: req.ip,
-        });
-        return res.status(403).json({ error: `Jerarquía Bancaria: Su rol (${actorRol}) no tiene permisos para promover a un usuario al nivel (${nombreRolSolicitado}).` });
-      }
-
-      // --- REGLA DE GOBERNANZA: LÍMITE SUPER_ADMIN (MAX 2) EN PROMOCIÓN ---
-      if (nombreRolSolicitado === 'SUPER_ADMIN' && usuario.idRol !== req.body.idRol) {
-        const totalSuperAdmins = await Usuario.count({
-          where: { cuentaActiva: true },
-          include: [{ model: Rol, as: 'rol', where: { nombre: 'SUPER_ADMIN' } }]
-        });
-
-        if (totalSuperAdmins >= 2) {
-           await registrarAuditoria({
-            idUsuario: req.user.idUsuario,
-            accion: 'INTENTO_PROMOCION_SUPER_ADMIN_FALLIDO',
-            tablaAfectada: 'USUARIOS',
-            descripcion: `Intento de promoción a SUPER_ADMIN fallido por límite de cuórum (2). Usuario objetivo: ${usuario.username}`,
-            ip: req.ip,
+        const transicion = validateRoleTransition(nuevoIdEmpleado, nombreRolActual, nombreRolDestino);
+        if (!transicion.valid) {
+          return res.status(422).json({
+            error: transicion.message,
+            requiresEmpleadoData: transicion.requiresEmpleadoData,
+            targetRole: nombreRolDestino,
+            userId: usuario.idUsuario,
           });
-          return res.status(403).json({ error: 'Seguridad Bancaria: No se puede promover el usuario a SUPER_ADMIN porque ya existen 2 SUPER_ADMIN activos.' });
+        }
+
+        // Límite máximo de 2 SUPER_ADMIN activos
+        if (nombreRolDestino === 'SUPER_ADMIN') {
+          const totalSuperAdmins = await Usuario.count({
+            where: { cuentaActiva: true },
+            include: [{ model: Rol, as: 'rol', where: { nombre: 'SUPER_ADMIN' } }]
+          });
+          if (totalSuperAdmins >= 2) {
+            return res.status(403).json({ error: 'Seguridad Bancaria: No se puede promover el usuario a SUPER_ADMIN porque ya existen 2 SUPER_ADMIN activos.' });
+          }
         }
       }
     }
 
-    // --- REGLA DE GOBERNANZA: PROTECCIÓN DEL ÚLTIMO SUPER_ADMIN (ABANDONO DE CARGO) ---
-    if (req.body.idRol && usuario.rol.nombre === 'SUPER_ADMIN' && req.body.idRol !== usuario.idRol) {
+    // 6. Protección del último SUPER_ADMIN (Evitar abandono de cargo)
+    if (req.body.idRol && nombreRolActual === 'SUPER_ADMIN' && req.body.idRol !== usuario.idRol) {
       const totalSuperAdminsActivos = await Usuario.count({
         where: { cuentaActiva: true },
         include: [{ model: Rol, as: 'rol', where: { nombre: 'SUPER_ADMIN' } }]
@@ -431,35 +373,30 @@ const actualizarUsuario = async (req, res) => {
       }
     }
 
-    // -------------------------------------
-
-    // --- VALIDACIÓN DE TRANSICIÓN DE ROL (EMPLEADO REQUERIDO) ---
-    if (req.body.idRol && req.body.idRol !== usuario.idRol) {
-      const rolDestino = await Rol.findByPk(req.body.idRol);
-      const nombreRolDestino = rolDestino?.nombre?.toUpperCase();
-      const rolOrigen = await Rol.findByPk(usuario.idRol);
-      const nombreRolOrigen = rolOrigen?.nombre?.toUpperCase();
-
-      // Verificar si la transición requiere datos de empleado
-      // Pasamos nuevoIdEmpleado (que puede venir del body en un reintento)
-      const transicion = validateRoleTransition(nuevoIdEmpleado, nombreRolOrigen, nombreRolDestino);
-      if (!transicion.valid) {
-        return res.status(422).json({
-          error: transicion.message,
-          requiresEmpleadoData: transicion.requiresEmpleadoData,
-          targetRole: nombreRolDestino,
-          userId: usuario.idUsuario,
-        });
+    // 7. Procesar otros campos (username, email, password)
+    if (req.body.username) {
+      req.body.username = req.body.username.trim().toLowerCase();
+      const existeUsername = await Usuario.findOne({ where: { username: req.body.username } });
+      if (existeUsername && existeUsername.idUsuario !== usuario.idUsuario) {
+        return res.status(400).json({ error: 'El nombre de usuario ya se encuentra registrado.' });
       }
     }
-    // -------------------------------------
 
-    // Re-hashear contraseña si viene nueva
+    if (req.body.email) {
+      req.body.email = req.body.email.trim().toLowerCase();
+      const existeEmail = await Usuario.findOne({ where: { email: req.body.email } });
+      if (existeEmail && existeEmail.idUsuario !== usuario.idUsuario) {
+        return res.status(400).json({ error: 'El correo electrónico ya se encuentra registrado.' });
+      }
+    }
+
     if (req.body.password) {
+      const SALT_ROUNDS = 10;
       req.body.passwordHash = await bcrypt.hash(req.body.password, SALT_ROUNDS);
       delete req.body.password;
     }
 
+    // 8. Aplicar actualización
     await usuario.update(req.body);
 
     const { passwordHash: _, ...actualizado } = usuario.toJSON();
@@ -554,13 +491,14 @@ const desactivarCuenta = async (req, res) => {
 
 const desactivarUsuario = async (req, res) => {
   try {
-    const usuario = await Usuario.findByPk(req.params.id);
+    const usuario = await Usuario.findByPk(req.params.id, {
+      include: [{ model: Rol, as: 'rol' }]
+    });
     if (!usuario) {
       return res.status(404).json({ error: 'Usuario no encontrado.' });
     }
 
-    const rolActual = await Rol.findByPk(usuario.idRol);
-    const nombreRolAfectado = rolActual ? rolActual.nombre : 'CLIENTE';
+    const nombreRolAfectado = usuario.rol ? usuario.rol.nombre : 'CLIENTE';
 
     if (req.user && !puedeModificar(req.user.rol, nombreRolAfectado)) {
       await registrarAuditoria({
@@ -575,7 +513,9 @@ const desactivarUsuario = async (req, res) => {
 
     // --- PROTECCIÓN DE SENIORITY (SUPER_ADMIN) ---
     if (req.user.rol === 'SUPER_ADMIN' && nombreRolAfectado === 'SUPER_ADMIN' && req.user.idUsuario !== usuario.idUsuario) {
-      const actor = await Usuario.findByPk(req.user.idUsuario);
+      const actor = await Usuario.findByPk(req.user.idUsuario, {
+        include: [{ model: Rol, as: 'rol' }]
+      });
       if (!esMasAntiguo(actor, usuario)) {
         await registrarAuditoria({
           idUsuario: req.user.idUsuario,
@@ -625,13 +565,14 @@ const desactivarUsuario = async (req, res) => {
 
 const reactivarUsuario = async (req, res) => {
   try {
-    const usuario = await Usuario.findByPk(req.params.id);
+    const usuario = await Usuario.findByPk(req.params.id, {
+      include: [{ model: Rol, as: 'rol' }]
+    });
     if (!usuario) {
       return res.status(404).json({ error: 'Usuario no encontrado.' });
     }
 
-    const rolActual = await Rol.findByPk(usuario.idRol);
-    const nombreRolAfectado = rolActual ? rolActual.nombre : 'CLIENTE';
+    const nombreRolAfectado = usuario.rol ? usuario.rol.nombre : 'CLIENTE';
 
     if (req.user && !puedeModificar(req.user.rol, nombreRolAfectado)) {
       const errorMsg = nombreRolAfectado === 'SUPER_ADMIN' 
