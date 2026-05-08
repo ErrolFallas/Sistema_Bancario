@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useToastContext } from '../context/ToastContext';
 import usuarioService from '../services/usuarioService';
 import rolService from '../services/rolService';
+import bancoService from '../services/bancoService';
 import CustomSelect from '../components/ui/CustomSelect';
 import { getCreatableRoles, hasSeniority } from '../helpers/roleHelpers';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
@@ -11,10 +12,11 @@ import '../css/forms.css';
 import '../css/dashboard.css';
 
 /**
- * Editar Usuario — Formulario Enterprise
- * ───────────────────────────────────────
+ * Editar Usuario — Formulario Enterprise con Transición de Rol
+ * ─────────────────────────────────────────────────────────────
  * Carga los datos del usuario por ID y permite su actualización.
- * Implementa gobernanza estricta de roles y estética Glassmorphism.
+ * Si se intenta degradar a GERENTE/EMPLEADO sin datos laborales,
+ * abre un modal para completar la ficha de empleado.
  */
 const EditarUsuario = () => {
   const { id } = useParams();
@@ -24,6 +26,7 @@ const EditarUsuario = () => {
 
   const [usuario, setUsuario] = useState(null);
   const [roles, setRoles] = useState([]);
+  const [bancos, setBancos] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ 
@@ -32,13 +35,26 @@ const EditarUsuario = () => {
     idRol: '' 
   });
 
+  // ── Estado del Modal de Transición de Rol ──────────────────
+  const [showEmpleadoModal, setShowEmpleadoModal] = useState(false);
+  const [pendingIdRol, setPendingIdRol] = useState(null);
+  const [pendingTargetRole, setPendingTargetRole] = useState('');
+  const [empleadoForm, setEmpleadoForm] = useState({
+    nombre: '',
+    apellido: '',
+    telefono: '',
+    idBanco: '',
+  });
+  const [savingTransition, setSavingTransition] = useState(false);
+
   // ── Cargar datos iniciales ───────────────────────────────────
   useEffect(() => {
     const cargarDatos = async () => {
       try {
-        const [usuarioData, rolesData] = await Promise.all([
+        const [usuarioData, rolesData, bancosData] = await Promise.all([
           usuarioService.getById(id),
           rolService.getAll(),
+          bancoService.getAll(),
         ]);
         
         setUsuario(usuarioData);
@@ -48,13 +64,7 @@ const EditarUsuario = () => {
           idRol: usuarioData.idRol || '',
         });
         setRoles(rolesData);
-
-        // Protección de Seniority/Jerarquía (Frontend check)
-        const targetRole = usuarioData.rol?.nombre?.toUpperCase();
-        if (user.rol !== 'SUPER_ADMIN') {
-          // Si no es Super Admin, no puede editar a otros si no tiene jerarquía
-          // (Backend también valida esto)
-        }
+        setBancos(bancosData);
       } catch (err) {
         toast.error(err.message || 'Error al cargar la información del usuario.');
       } finally {
@@ -68,6 +78,11 @@ const EditarUsuario = () => {
   const handleChange = (e) => {
     const { name, value } = e.target;
     setForm(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleEmpleadoChange = (e) => {
+    const { name, value } = e.target;
+    setEmpleadoForm(prev => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = async (e) => {
@@ -84,9 +99,66 @@ const EditarUsuario = () => {
       toast.success(response.mensaje || 'Usuario actualizado correctamente.');
       navigate('/usuarios');
     } catch (err) {
-      toast.error(err.message || 'Error al intentar actualizar el usuario.');
+      // ── DETECTAR SEÑAL DE TRANSICIÓN DE ROL (422) ─────────────
+      if (err.requiresEmpleadoData) {
+        // El backend indica que el usuario necesita datos laborales
+        const targetRolObj = roles.find(r => r.idRol === Number(form.idRol));
+        setPendingIdRol(Number(form.idRol));
+        setPendingTargetRole(targetRolObj?.nombre?.toUpperCase() || err.targetRole || '');
+        setShowEmpleadoModal(true);
+        // Restaurar el rol en el form al original
+        setForm(prev => ({ ...prev, idRol: usuario.idRol }));
+      } else {
+        toast.error(err.message || 'Error al intentar actualizar el usuario.');
+      }
     } finally {
       setSaving(false);
+    }
+  };
+
+  // ── Handler: Completar transición con datos de empleado ─────
+  const handleTransitionSubmit = async (e) => {
+    e.preventDefault();
+
+    if (!empleadoForm.nombre.trim()) {
+      toast.warning('El nombre del empleado es obligatorio.');
+      return;
+    }
+    if (!empleadoForm.apellido.trim()) {
+      toast.warning('El apellido del empleado es obligatorio.');
+      return;
+    }
+    if (!empleadoForm.idBanco) {
+      toast.warning('Debe seleccionar un banco para el empleado.');
+      return;
+    }
+
+    setSavingTransition(true);
+    try {
+      const empleadoData = {
+        nombre: empleadoForm.nombre.trim(),
+        apellido: empleadoForm.apellido.trim(),
+        telefono: empleadoForm.telefono.trim() || null,
+        idBanco: Number(empleadoForm.idBanco),
+      };
+
+      const response = await usuarioService.updateWithEmpleado(id, empleadoData, pendingIdRol);
+      toast.success(response.mensaje || `Usuario actualizado a ${pendingTargetRole} exitosamente.`);
+      setShowEmpleadoModal(false);
+      navigate('/usuarios');
+    } catch (err) {
+      toast.error(err.message || 'Error al completar la transición de rol.');
+    } finally {
+      setSavingTransition(false);
+    }
+  };
+
+  const cerrarModal = () => {
+    if (!savingTransition) {
+      setShowEmpleadoModal(false);
+      setPendingIdRol(null);
+      setPendingTargetRole('');
+      setEmpleadoForm({ nombre: '', apellido: '', telefono: '', idBanco: '' });
     }
   };
 
@@ -200,6 +272,101 @@ const EditarUsuario = () => {
           </footer>
         </form>
       </div>
+
+      {/* ═══════════════════════════════════════════════════════════
+          MODAL: Ficha de Empleado (Transición de Rol)
+          Se muestra cuando el backend responde requiresEmpleadoData
+          ═══════════════════════════════════════════════════════════ */}
+      {showEmpleadoModal && (
+        <div className="modal-overlay" onClick={cerrarModal}>
+          <div
+            className="modal-content"
+            style={{ borderColor: 'rgba(0, 180, 216, 0.3)', maxWidth: '520px' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modal-header">
+              <h3 style={{ color: 'var(--secondary-color)' }}>
+                🏛️ Ficha de Empleado Requerida
+              </h3>
+            </div>
+
+            <div className="modal-body">
+              <p style={{ marginBottom: '1rem', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+                Para asignar el rol <strong style={{ color: 'var(--secondary-color)' }}>{pendingTargetRole}</strong> a{' '}
+                <strong>{usuario.username}</strong>, primero debe completar los datos laborales.
+              </p>
+
+              <form onSubmit={handleTransitionSubmit} className="enterprise-form" id="empleadoTransitionForm">
+                <div className="form-grid">
+                  <div className="form-group">
+                    <label htmlFor="empNombre">Nombre(s) *</label>
+                    <input
+                      type="text" id="empNombre" name="nombre"
+                      value={empleadoForm.nombre} onChange={handleEmpleadoChange}
+                      placeholder="Nombre del empleado"
+                      disabled={savingTransition}
+                      required
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label htmlFor="empApellido">Apellido(s) *</label>
+                    <input
+                      type="text" id="empApellido" name="apellido"
+                      value={empleadoForm.apellido} onChange={handleEmpleadoChange}
+                      placeholder="Apellido del empleado"
+                      disabled={savingTransition}
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="form-grid">
+                  <div className="form-group">
+                    <label htmlFor="empTelefono">Teléfono Interno</label>
+                    <input
+                      type="text" id="empTelefono" name="telefono"
+                      value={empleadoForm.telefono} onChange={handleEmpleadoChange}
+                      placeholder="Ext. 0000"
+                      disabled={savingTransition}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <CustomSelect
+                      label="Banco Asignado"
+                      name="idBanco"
+                      value={empleadoForm.idBanco}
+                      onChange={handleEmpleadoChange}
+                      options={bancos.map(banco => ({
+                        value: banco.idBanco,
+                        label: banco.nombre
+                      }))}
+                      placeholder="Seleccionar Banco"
+                      disabled={savingTransition}
+                      required
+                    />
+                  </div>
+                </div>
+              </form>
+            </div>
+
+            <div className="modal-actions">
+              <button
+                className="btn-secondary"
+                onClick={cerrarModal}
+                disabled={savingTransition}
+              >
+                Cancelar
+              </button>
+              <button
+                className="btn-primary"
+                onClick={handleTransitionSubmit}
+                disabled={savingTransition}
+              >
+                {savingTransition ? 'Procesando...' : `Crear Ficha y Asignar ${pendingTargetRole}`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

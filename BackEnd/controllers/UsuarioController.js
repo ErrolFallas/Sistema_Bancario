@@ -14,13 +14,17 @@ const bcrypt = require('bcrypt');
 const { Usuario, Rol, Cliente, Empleado } = require('../models');
 const { registrarAuditoria, descripcionCrearUsuario } = require('../utils/auditoria');
 const { puedeModificar, puedeCrearRol, esMasAntiguo } = require('../utils/jerarquia');
+const { validateRoleTransition } = require('../utils/roleTransitionValidator');
 
 const SALT_ROUNDS = 10;
-
 // ============================================
 // Función auxiliar: validar reglas por rol
 // ============================================
-const validarReglasRol = async (idRol, idCliente, idEmpleado, actorRol = null) => {
+// isTransition: indica si es un cambio de rol (no una creación nueva)
+//   - Si es transición y falta id_empleado, se delega al roleTransitionValidator
+//   - Si es creación nueva, se exige id_empleado como antes
+// ============================================
+const validarReglasRol = async (idRol, idCliente, idEmpleado, actorRol = null, isTransition = false) => {
   // Obtener el nombre del rol
   const rol = await Rol.findByPk(idRol);
   if (!rol) {
@@ -65,28 +69,38 @@ const validarReglasRol = async (idRol, idCliente, idEmpleado, actorRol = null) =
   }
 
   // REGLA: EMPLEADO / GERENTE → requiere id_empleado
+  // PERO: Si es una transición de rol, se delega al roleTransitionValidator (422)
   if (nombreRol === 'EMPLEADO' || nombreRol === 'GERENTE') {
     if (!idEmpleado) {
-      return { valido: false, status: 400, error: `Error de validación: Para el rol ${nombreRol}, el campo id_empleado es obligatorio. Debe existir previamente un registro en EMPLEADOS.` };
-    }
-    if (idCliente) {
-      return { valido: false, status: 400, error: `Error de validación: Un usuario con rol ${nombreRol} no puede tener id_cliente asignado.` };
-    }
-    // Verificar que el empleado exista
-    const empleado = await Empleado.findByPk(idEmpleado);
-    if (!empleado) {
-      return { valido: false, status: 404, error: `Error de validación: No se encontró un registro de Empleado con el ID '${idEmpleado}'. Debe crear el empleado primero.` };
+      if (isTransition) {
+        // DELEGACIÓN: No bloquear aquí. El roleTransitionValidator
+        // (más abajo en actualizarUsuario) responderá con 422 + modal
+        // Solo validar que no tenga id_cliente incompatible
+        if (idCliente) {
+          return { valido: false, status: 400, error: `Error de validación: Un usuario con rol ${nombreRol} no puede tener id_cliente asignado.` };
+        }
+      } else {
+        // Creación nueva: exigir id_empleado como siempre
+        return { valido: false, status: 400, error: `Error de validación: Para el rol ${nombreRol}, el campo id_empleado es obligatorio. Debe existir previamente un registro en EMPLEADOS.` };
+      }
+    } else {
+      // Tiene idEmpleado — validar que no tenga cliente y que exista
+      if (idCliente) {
+        return { valido: false, status: 400, error: `Error de validación: Un usuario con rol ${nombreRol} no puede tener id_cliente asignado.` };
+      }
+      const empleado = await Empleado.findByPk(idEmpleado);
+      if (!empleado) {
+        return { valido: false, status: 404, error: `Error de validación: No se encontró un registro de Empleado con el ID '${idEmpleado}'. Debe crear el empleado primero.` };
+      }
     }
   }
 
-  // REGLA: ADMIN → sin relaciones
+  // REGLA: ADMIN → sin relaciones (pero permitir id_empleado heredado)
   if (nombreRol === 'ADMIN') {
     if (idCliente) {
       return { valido: false, status: 400, error: 'Error de validación: Un usuario con rol ADMIN no puede tener id_cliente asignado.' };
     }
-    if (idEmpleado) {
-      return { valido: false, status: 400, error: 'Error de validación: Un usuario con rol ADMIN no puede tener id_empleado asignado.' };
-    }
+    // id_empleado es opcional para ADMIN (puede tener uno heredado de un rol previo)
   }
 
   return { valido: true, nombreRol };
@@ -271,8 +285,11 @@ const actualizarUsuario = async (req, res) => {
     }
 
     // Validar reglas por rol (solo si se está cambiando rol o relaciones)
+    // isTransition = true: estamos ACTUALIZANDO, no creando. Si falta id_empleado
+    // para GERENTE/EMPLEADO, se delega al roleTransitionValidator (422 + modal)
     if (req.body.idRol || req.body.hasOwnProperty('idCliente') || req.body.hasOwnProperty('idEmpleado')) {
-      const validacion = await validarReglasRol(nuevoIdRol, nuevoIdCliente, nuevoIdEmpleado, req.user?.rol);
+      const isTransition = !!req.body.idRol && req.body.idRol !== usuario.idRol;
+      const validacion = await validarReglasRol(nuevoIdRol, nuevoIdCliente, nuevoIdEmpleado, req.user?.rol, isTransition);
       if (!validacion.valido) {
         return res.status(validacion.status).json({ error: validacion.error });
       }
@@ -377,6 +394,27 @@ const actualizarUsuario = async (req, res) => {
           });
           return res.status(403).json({ error: 'Seguridad Bancaria: No se puede promover el usuario a SUPER_ADMIN porque ya existen 2 SUPER_ADMIN activos.' });
         }
+      }
+    }
+    // -------------------------------------
+
+    // --- VALIDACIÓN DE TRANSICIÓN DE ROL (EMPLEADO REQUERIDO) ---
+    if (req.body.idRol && req.body.idRol !== usuario.idRol) {
+      const rolDestino = await Rol.findByPk(req.body.idRol);
+      const nombreRolDestino = rolDestino?.nombre?.toUpperCase();
+      const rolOrigen = await Rol.findByPk(usuario.idRol);
+      const nombreRolOrigen = rolOrigen?.nombre?.toUpperCase();
+
+      // Verificar si la transición requiere datos de empleado
+      // Pasamos nuevoIdEmpleado (que puede venir del body en un reintento)
+      const transicion = validateRoleTransition(nuevoIdEmpleado, nombreRolOrigen, nombreRolDestino);
+      if (!transicion.valid) {
+        return res.status(422).json({
+          error: transicion.message,
+          requiresEmpleadoData: transicion.requiresEmpleadoData,
+          targetRole: nombreRolDestino,
+          userId: usuario.idUsuario,
+        });
       }
     }
     // -------------------------------------

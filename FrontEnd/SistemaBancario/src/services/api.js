@@ -47,7 +47,11 @@ api.interceptors.response.use(
     return Promise.reject({
       status: error.response?.status,
       message: message,
-      detail: error.response?.data?.detalle || null
+      detail: error.response?.data?.detalle || null,
+      // Señales de transición de rol (422 desde roleTransitionValidator)
+      requiresEmpleadoData: error.response?.data?.requiresEmpleadoData || false,
+      targetRole: error.response?.data?.targetRole || null,
+      userId: error.response?.data?.userId || null,
     });
   }
 );

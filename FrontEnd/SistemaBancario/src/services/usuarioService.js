@@ -48,6 +48,32 @@ const usuarioService = {
   },
 
   /**
+   * Transición de rol con datos de empleado.
+   * Para degradaciones de ADMIN/SUPER_ADMIN → GERENTE/EMPLEADO
+   * cuando el usuario NO tiene id_empleado.
+   * 
+   * Flujo:
+   *   1. Crear registro de Empleado (POST /empleados)
+   *   2. Actualizar usuario con idEmpleado + nuevo idRol (PATCH /usuarios/:id)
+   */
+  updateWithEmpleado: async (id, empleadoData, idRol) => {
+    // Paso 1: Crear empleado
+    const empleadoResponse = await api.post('/empleados', empleadoData);
+    const nuevoEmpleado = empleadoResponse.data;
+    const idEmpleado = nuevoEmpleado.idEmpleado;
+
+    // Paso 2: Actualizar usuario con el nuevo empleado y rol
+    const response = await api.patch(`/usuarios/${id}`, {
+      idRol,
+      idEmpleado,
+    });
+    return {
+      ...response.data,
+      empleadoCreado: nuevoEmpleado,
+    };
+  },
+
+  /**
    * Eliminar usuario
    */
   delete: async (id) => {
